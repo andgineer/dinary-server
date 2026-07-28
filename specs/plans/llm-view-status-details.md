@@ -18,6 +18,14 @@ plan is no longer frontend-only — it touches the controller and needs Python t
 Independent of the two `pwa-analytics-*` plans — no shared files (they touch
 `src/dinary/api/analytics.py`, this one `src/dinary/api/controllers/llm.py`).
 
+**Blocked by an llmbroker release.** §2 consumes a windowed journal aggregate that llmbroker does
+not expose yet — planned there as `specs/plans/journal-stats-window.md`, shipping together with
+the typed exceptions of `andgineer/llmbroker#11`. The alternative (reading the raw journal tail
+with `broker.calls(limit=…)` and folding it here) means reimplementing llmbroker's record model
+inside dinary: dropping `kind == "quality"` rows, knowing their `status` is `None`, and living
+with a window bounded by the row limit as well as by time. That is the host knowing too much about
+the library's journal, so this plan waits for the upstream API instead.
+
 ### Why the counter goes
 
 An absolute call count has no baseline to compare against and, under failover, is predetermined:
@@ -30,8 +38,8 @@ tail (`llmbroker/broker/learning.py`), rebuilt only when the pool is provisioned
 fails — a run of successful calls never moves it, and the count is capped by the tail window.
 That is the documented llmbroker contract (`specs/reference/decisions.md`, "Metrics stay in
 `snapshot()` … computed from the cached journal tail, with no queries of its own"), not a defect
-to fix upstream: this plan simply stops reading a field whose guarantee does not match what the
-screen needs, and derives its own aggregate from the journal instead.
+to fix upstream: this plan stops reading a field whose guarantee does not match what the screen
+needs, and consumes the windowed aggregate instead.
 
 What replaces it answers the one question the screen cannot answer today: a provider with
 `status: available` and a third of its calls failing over the week looks perfectly healthy here,
@@ -56,22 +64,16 @@ PWA, and the pool's read-only nature is already conveyed by the absence of an ad
 `llm_status` (`src/dinary/api/controllers/llm.py:56`) gains one journal read and folds the result
 into each provider dict.
 
-- Source: `await llms.calls(limit=…)` — the broker's public journal accessor
-  (`AsyncBroker.calls`, scope-aware). It reads the store directly and does **not** call
-  `ensure_pool()`, so it is safe on an empty registry; it raises `TypeError` only for a
-  non-queryable backend, which the sqlite store is not. Do not query `llmbroker_calls` directly:
-  the llmbroker table schema is explicitly not a public contract.
-- Skip the read entirely when the snapshot is empty — nothing to attribute rows to.
-- Keep rows with `kind == "call"`. The journal interleaves `kind == "quality"` records, whose
-  `status` is `None` by construction; counting them would inflate the denominator.
-- Window: rows whose `ts` is within the last 7 days. Drop rows with `ts is None` rather than
-  treating them as recent. Journal retention is 90 days upstream (`llmbroker/sqlite/store.py`),
-  so a 7-day window is always fully covered.
-- `limit=1000`: the pipeline writes about one call plus one quality record per receipt, so a week
-  of normal use is a few hundred rows. The window is bounded by *both* the limit and the 7 days —
-  if the tail ever fills the limit the effective window is shorter. Accepted, not detected: at
-  this volume it does not arise, and the alternative is an unbounded read.
-- Failure = any `status` other than `CallStatus.OK` (`RATE_LIMITED`, `UNAVAILABLE`, `ERROR`).
+- Source: `await llms.stats(since=…)` — llmbroker's windowed journal aggregate, per provider and
+  per call status. It reads the store directly without provisioning the pool, so it is safe on an
+  empty registry. Do not query `llmbroker_calls` directly: the llmbroker table schema is
+  explicitly not a public contract.
+- Skip the read entirely when the snapshot is empty — nothing to attribute the counts to.
+- Window: 7 days, i.e. `since = now - 7d`. Journal retention is 90 days upstream, so the window is
+  always fully covered. Which records count and how the window is bounded are llmbroker's
+  concern — dinary passes `since` and reads the per-status counts.
+- Failure = any status other than `CallStatus.OK` (`RATE_LIMITED`, `UNAVAILABLE`, `ERROR`). The
+  library deliberately does not decide this; the sum is taken here.
   **429 counts as a failure on purpose**: for the user the effect is identical — that call
   returned nothing and the request spilled to the next model. That quota exhaustion is "normal"
   for a free tier is exactly what the number should make visible, not hide.
@@ -153,8 +155,12 @@ takes their place, driven by the §2 fields:
 - `health.strategy` (`"failover"`, computed in `llm_status`) stays unrendered — the bare word
   tells the user nothing.
 - `base_url` stays unrendered.
-- No llmbroker change. `snapshot().metrics` keeps its documented cached-tail semantics; dinary
-  simply stops reading it.
+- `snapshot().metrics` keeps its documented cached-tail semantics upstream — dinary simply stops
+  reading it. Nothing here asks llmbroker to change that field.
+- Narrowing `except RuntimeError` in `llm_status` / `set_provider_disabled` to
+  `EmptyRegistryError` (`andgineer/llmbroker#11`). It rides the same dependency bump and touches
+  the same file, so do it in this batch if the types are already released — but it is not part of
+  this plan's deliverable and needs no UI change.
 
 ## 6. Tests
 
@@ -212,6 +218,8 @@ Frontend (`webapp/tests/`):
 
 ## Work order and done gate
 
+0. Bump the llmbroker dependency to the release carrying the windowed aggregate — §2 does not
+   exist without it.
 1. Backend window aggregate (§2) + Python tests — the frontend has nothing to render without it.
 2. Drop the pool hint (§1).
 3. `useNow.js`, `ProviderCard` cooldown + reliability line, `LLMView` tick fix (§3, §4).
