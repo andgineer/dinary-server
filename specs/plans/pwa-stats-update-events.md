@@ -35,12 +35,34 @@ DB schema: `events(id,name,date_from,date_to,…)`,
 
 ## Part 1. Cache invalidation like review's (dirty-until-processed)
 
+### 1.0 Backend: `receipts_queue` in the summary response
+`GET /api/analytics/summary` gains the same `receipts_queue` block the review feed already
+returns (`rules.py:209` → `classification_job_counts`, `src/dinary/db/receipts.py:305`) —
+import that helper, do not re-query.
+
+This is what makes the rule hold. Review can stay dirty-until-processed only because its *own*
+response carries the queue, so `loadNextPage` re-marks itself on every fetch
+(`stores/review.js:100-103`). Analytics has no such signal and — per 1.3 — no background probe,
+so without the queue in its own response the flag would clear on the first stats-page open
+after a scan and never come back:
+
+> scan → `markDirty` → user opens Stats while `pending > 0` → fetch → `stampFresh()` → clean.
+> The server finishes 30 s later. `review.loadNextPage` re-marks only *while* the queue is
+> non-empty, the drain to zero raises no event, and review may not be mounted at all — nothing
+> ever marks analytics again. Stats show pre-receipt numbers until the 24 h TTL or an unrelated
+> income edit.
+
 ### 1.1 Move `stores/analytics.js` onto `useStaleCache`
 - Wire up `useStaleCache({ dirtyKey: "dinary:analytics:dirty",
   fetchedKey: "dinary:analytics:fetchedAt", dataKey: "dinary:analytics:v1" })`.
-- Store `summary/events/trends` through `readCache`/`writeCache` (one object).
-- Replace the TTL check in `fetchAll` with `isStale()`; after a successful fetch —
-  `stampFresh()` + `writeCache(...)`.
+- Store `summary/events/trends` through `readCache`/`writeCache` (one object). The data key is
+  reused as-is: an object written by the old build carries an extra `lastFetched` field that
+  the new reader ignores, and the missing `fetchedKey` makes `isStale()` true → one refetch.
+- Replace the TTL check in `fetchAll` with `isStale()`. After a successful fetch —
+  `writeCache(...)`, then **`stampFresh()` only when every `receipts_queue` counter is zero;
+  otherwise `bumpFetchTime()`**, which records the fetch but leaves the dirty flag up.
+  `useStaleCache` already exports `bumpFetchTime` for exactly this (currently unused in `src/`,
+  covered by `composable-stale-cache.test.js:74`).
 - Rename the method to `loadIfNeeded()` (consistent with review/income); export `markDirty`.
 - Drop `invalidate()`; use `markDirty()` instead.
 
@@ -50,7 +72,7 @@ DB schema: `events(id,name,date_from,date_to,…)`,
 |---|---|---|
 | New expense sent to the server | `composables/flushQueue.js` | on `anyFlushed` → `useAnalyticsStore().markDirty()` |
 | Receipt scanned (not a duplicate) | `composables/flushReceiptQueue.js` | next to `useLlmStore().markDirty()` / `useReviewStore().markDirty()` → `useAnalyticsStore().markDirty()` |
-| Server receipt queue non-empty | `stores/review.js` `loadNextPage` | inside the `if (q.pending>0 …)` block add `useAnalyticsStore().markDirty()` — this is what "dirty until all receipts are processed" means |
+| Server receipt queue non-empty | `stores/review.js` `loadNextPage` | inside the `if (q.pending>0 …)` block add `useAnalyticsStore().markDirty()` — belt-and-braces only, it fires just when review happens to be fetching. The rule itself is carried by 1.0 |
 | Category/expense edit, delete, rule confirmation, stuck-receipt resolution, receipt delete | `stores/review.js` (`correct`, `updateExpense`, `deleteExpense`, `confirmAll`, `resolveStuckReceipt`, `deleteReceipt`) | `useAnalyticsStore().markDirty()` |
 | Income add/patch/remove | `stores/income.js` | replace 3× `useAnalyticsStore().invalidate()` → `markDirty()` |
 
@@ -61,10 +83,13 @@ DB schema: `events(id,name,date_from,date_to,…)`,
   and loads when the tab is opened; the tab-level `loadIfNeeded()` on stale fully covers the
   requirement (deliberate scope narrowing).
 
-Result: after an expense/income is added or a receipt is scanned the store is marked dirty;
-while the server finishes processing receipts it is re-marked via `review.loadNextPage`; the
-first stats-page open after processing does a fresh fetch and clears the flag — exactly the
-review semantics.
+Result: after an expense/income is added or a receipt is scanned the store is marked dirty. A
+fetch taken while the server queue is still draining writes the data but keeps the flag up
+(1.0), so the next stats-page open refetches; the first fetch that sees an empty queue clears
+the flag — exactly the review semantics, and independent of whether review was ever opened.
+
+Cost: every stats-page open while receipts are in flight is one extra request on the next open.
+Bounded by the queue draining, and the page is opened by hand.
 
 ## Part 2. Per-event drill-down (on click)
 
@@ -78,26 +103,42 @@ New route in `src/dinary/api/analytics.py`, 404 when the event does not exist. R
 ```
 
 Two new SQL files in `src/dinary/db/sql/`:
-- `analytics_event_categories.sql` — `expenses JOIN categories JOIN category_groups
+- `analytics_event_categories.sql` — `expenses JOIN categories LEFT JOIN category_groups
   WHERE event_id=? GROUP BY category ORDER BY SUM(amount) DESC`.
+  **`category_groups` must be a LEFT JOIN**: `categories.group_id` is nullable
+  (`0001_initial_schema.sql:14`) and only `is_active=1` rows are guaranteed a group
+  (`db/catalog.py:90-91`), so an inner join silently drops expenses booked to a since-retired
+  category and the breakdown stops summing to the event total. `group_name` is then null for
+  those rows — render them under a neutral fallback label rather than hiding them.
+  (`categories.category_id` needs no such care: `expenses.category_id` is `NOT NULL`.)
 - `analytics_event_days.sql` — `WHERE event_id=? GROUP BY date(datetime) ORDER BY day DESC
-  LIMIT 7` (the event's last few days, most recent first).
+  LIMIT 7` (the event's last few days, most recent first). Bucketing on the raw `datetime`
+  matches how `analytics_summary.sql` already buckets months.
 
 Reuse `_fmt` and `settings.accounting_currency`; for `date_label` use a short day format
 (e.g. "14 Jul").
 
 ### 2.2 Frontend
 - `api/analytics.js` → `fetchEventDetail(eventId)`.
-- `stores/analytics.js` → `eventDetails` (in-memory map by id), `loadEventDetail(id)`
-  (fetch + cache), reset `eventDetails` on `reset()`/a new fetch (so the detail obeys the
-  dirty flag too).
+- `stores/analytics.js` → `eventDetails` (in-memory map by id, not persisted),
+  `loadEventDetail(id)` (fetch + cache). Clear `eventDetails` at the start of every successful
+  summary fetch — that is what makes the detail obey the dirty flag, since a stale flag always
+  forces a summary refetch first. (The store has no `reset()` today and does not need one.)
 - `AnalyticsView.vue` — make the event row expandable (accordion).
   Important: use a separate `expandedEventId` state for expansion — the `ev.open` field is
   already taken (it means "the event is still running") and must not be conflated. On expand:
   fetch the detail (skeleton while loading), then two blocks styled like the current cards:
   - By category — "category · amount" rows with a proportional bar (inline CSS, no third-party
     libs — the project has none), sorted descending.
-  - By day — "day · amount" rows for the last few days.
+  - By day — "day · amount" rows for the last few days. Give the block an explicit
+    "last 7 days" heading: `days` is capped at 7 rows, so for a longer event it does not add up
+    to the event total in the row above, and an unlabelled block reads as a bug.
+- Accessibility: `.event-row` is a `<div>` today (`AnalyticsView.vue:93-98`). The clickable
+  part becomes a `<button>` carrying `aria-expanded` and `aria-controls`, with the detail
+  panel as its target.
+- Offline/error: `eventDetails` is memory-only, so an expanded row on a cold offline start has
+  nothing to show and no way to fetch. Render an explicit "offline" / "failed to load" line in
+  the panel — never a skeleton that spins forever.
 
 ## Part 3. LLM view: drop the path hint, surface cooldown and last-call time
 
@@ -176,13 +217,22 @@ yet they are "the pipeline is dead" vs "the pipeline is working".
 
 Python (`tests/api/test_api_analytics.py`, class `TestAnalyticsEventDetail`):
 - category breakdown sorted descending and amounts correct;
+- **an expense in a category with `group_id IS NULL` still appears, and the breakdown sums to
+  the event total** — the regression test for the LEFT JOIN in 2.1;
 - daily breakdown returns correct sums and honours the limit;
 - 404 for a non-existent event;
 - currency = accounting_currency, formatting with spaces.
 
+Python, Part 1 (`tests/api/test_api_analytics.py`): the summary response carries
+`receipts_queue`, zeroed when no jobs exist and reflecting queued jobs otherwise.
+
 Frontend (`webapp/tests/`):
 - new `store-analytics.test.js`: `markDirty` → `isStale` → refetch; `loadIfNeeded` skips the
-  fetch on a fresh cache; event-detail caching.
+  fetch on a fresh cache; event-detail caching; details cleared by a summary refetch.
+- **the dirty-until-processed rule itself**, in `store-analytics.test.js`: a fetch answering
+  with a non-empty `receipts_queue` leaves `isStale()` true (so the next open refetches), a
+  fetch answering with an all-zero queue clears it. This is the requirement from Task §1 —
+  the `store-review.test.js` case below only covers the secondary trigger.
 - extend `composable-flush-queue.test.js` and `composable-flush-receipt-queue.test.js`:
   assert `analytics.markDirty`.
 - extend `store-review.test.js`: analytics re-marked while the receipt queue is non-empty.
@@ -207,8 +257,10 @@ No new Python tests for Part 3 — no backend change.
 
 ## Part 5. Specs
 - `specs/reference/pwa-analytics.md`: rewrite the "Client cache" section for the dirty flag
-  (expense/income/receipt, dirty-until-processed); add the event-detail endpoint and describe
-  the "by category" and "by recent days" breakdowns.
+  (expense/income/receipt, dirty-until-processed — stating that a fetch taken while receipts
+  are still being processed does not count as fresh); add the event-detail endpoint and
+  describe the "by category" and "by recent days" breakdowns, including that the category
+  breakdown covers the whole event while the day breakdown is capped at the most recent days.
 - `specs/reference/frontend-cache.md`: add an "Analytics store dirty-flag sources" section
   modelled on review/llm.
 - `specs/ui/screens.md`, `## LLM view` — three fixes, all from Part 3:
@@ -225,7 +277,8 @@ No new Python tests for Part 3 — no backend change.
 (Specs — current state and rules only, no signatures/field names — per CLAUDE.md.)
 
 ## Work order and done gate
-1. Refactor `analytics.js` onto `useStaleCache` + income-store edits.
+0. Add `receipts_queue` to the summary response (1.0) — everything in Part 1 rests on it.
+1. Refactor `analytics.js` onto `useStaleCache` (queue-aware stamping) + income-store edits.
 2. Add `markDirty` at every point (flushQueue, flushReceiptQueue, review mutations + queue).
 3. Backend detail endpoint + 2 SQL files + tests.
 4. Event-expansion UI + store detail + tests.
