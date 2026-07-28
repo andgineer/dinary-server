@@ -1,43 +1,31 @@
-# Analytics LLM secrets — future resolution
+# Problem: LLM key resolution for analytics on a separate machine
 
-## Current state
+No solution chosen yet. This file states the problem only.
 
-`inv analytics` resolves the Gemini API key by reading `.deploy/llms.toml` (for the
-`api_key_ref` env-var name) and then looking up that env var. This requires `.deploy/`
-to exist on the machine running analytics and the env vars to be set there. If either
-is absent the task exits with a clear error.
+## The problem
 
-This works when analytics runs on the same machine as the deploy config. It breaks
-when analytics runs on a machine that only has analytics installed and network access
-to the dinary API.
+`inv analytics` resolves LLM keys from two files on the machine it runs on: `.deploy/llms.toml`
+for each provider's `api_key_ref`, and `.deploy/.env` for the value stored under that ref
+(`tasks/analytics.py:40-67` — the values come from the env *file* via `dotenv_values`, not from
+the process environment). If either file is missing the task exits with a clear error.
 
-## Problem
+That works while analytics runs on the machine that holds the deploy config. It breaks when
+analytics runs somewhere that has only the analytics package installed — the operator has to
+reproduce two deploy files, one of which carries secrets, on every such machine.
 
-The dinary server stores resolved keys in `llmbroker_secrets` (sqlite). The analytics
-process has no access to that DB. Requiring `.deploy/llms.toml` + env vars on every
-analytics machine is operationally heavy.
+## Constraints any solution has to respect
 
-## Options to decide later
+- **Analytics never calls the running dinary server** — a stated architectural decision
+  (`specs/reference/analytics-ai.md`, "LLM strategy"). Fetching keys from a dinary endpoint is
+  not a free option; it would need that decision revisited first.
+- **The server's own keys are not reachable from analytics.** Since the llmbroker 1.3.0 upgrade
+  the broker owns its key storage inside its own `llmbroker_`-prefixed schema; dinary's former
+  `llmbroker_secrets` table was dropped (`0002_llmbroker_1_3_0_upgrade.sql`). There is no dinary
+  table to read keys from, and no established way to export values out of llmbroker.
+- **Anything that moves key values over the network needs an auth layer** the app does not have
+  today.
 
-**Option A — dinary API endpoint**
+## Status
 
-Add `GET /api/llm/keys` (admin-only) that returns `{ref: resolved_value}` for all
-secrets in `llmbroker_secrets`. Analytics fetches this endpoint and resolves keys
-without needing local files.
-
-Upside: zero local config on the analytics machine.
-Downside: exposes key values over the API; requires auth (currently no auth layer).
-
-**Option B — local secrets file**
-
-Define a minimal `~/.config/dinary/secrets.toml` (or `.deploy/secrets.toml`) that
-analytics reads directly. Operator copies it once; it has only the key values needed
-by analytics (e.g. `GEMINI_API_KEY`). Not synced during `inv deploy`.
-
-Upside: no API changes; keys never leave the machine.
-Downside: another file for the operator to maintain.
-
-## Decision
-
-Deferred. Current `.deploy/llms.toml` + env vars approach is acceptable until
-analytics needs to run on a separate machine in practice.
+Deferred until analytics actually has to run on a separate machine. Until then the two-file
+requirement is acceptable.

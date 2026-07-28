@@ -14,8 +14,12 @@ Relevant schema: `events(id, name, date_from, date_to, …)`,
 `expenses(amount, datetime, category_id, event_id, …)`, `categories(id, name, group_id)`,
 `category_groups(id, name)`.
 
-Independent of `pwa-analytics-refresh.md`; only §2 touches the same store, and only to clear an
-in-memory map after a summary fetch. Whichever lands second adapts that one line.
+**Do this after `pwa-analytics-refresh.md`.** The two share five files
+(`api/analytics.py`, `stores/analytics.js`, `views/AnalyticsView.vue`,
+`webapp/tests/store-analytics.test.js`, `specs/reference/pwa-analytics.md`), and that plan
+rewrites the store onto `useStaleCache` — building the detail map against the current store shape
+means writing it twice. It also supplies the dirty flag that §2's cache-clearing rule leans on;
+without it the drill-down follows the 24 h TTL and can show pre-receipt numbers.
 
 ## 1. Backend: `GET /api/analytics/events/{event_id}`
 
