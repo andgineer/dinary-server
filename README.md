@@ -23,20 +23,21 @@
 | src/dinary/api/controllers/catalog\_writer\_events.py          |      187 |       33 |     82% |35, 184-186, 201, 211-216, 243, 245, 247, 249, 259, 275, 311-313, 332, 339, 349-351, 378, 382-384, 391-393, 410, 423-425 |
 | src/dinary/api/controllers/catalog\_writer\_groups.py          |       76 |       31 |     59% |25-29, 90-92, 105-145, 154, 171 |
 | src/dinary/api/controllers/category\_templates.py              |       80 |        1 |     99% |       118 |
-| src/dinary/api/controllers/expense\_corrections.py             |      102 |        3 |     97% |134-135, 169 |
-| src/dinary/api/controllers/expenses.py                         |      172 |       17 |     90% |225-226, 262-272, 321, 392-394, 407-409 |
+| src/dinary/api/controllers/correction\_ratings.py              |       35 |        2 |     94% |     41-42 |
+| src/dinary/api/controllers/expense\_corrections.py             |       76 |        1 |     99% |        98 |
+| src/dinary/api/controllers/expenses.py                         |      176 |       17 |     90% |226-227, 263-273, 322, 400-402, 415-417 |
 | src/dinary/api/controllers/income.py                           |       57 |        2 |     96% |   134-135 |
 | src/dinary/api/controllers/llm.py                              |       44 |        3 |     93% | 25, 88-89 |
 | src/dinary/api/controllers/receipt\_queue.py                   |       68 |        3 |     96% |99, 122, 197 |
-| src/dinary/api/controllers/rules.py                            |       54 |        2 |     96% |     41-42 |
+| src/dinary/api/controllers/rules.py                            |       58 |        2 |     97% |     42-43 |
 | src/dinary/api/currencies.py                                   |       33 |        0 |    100% |           |
-| src/dinary/api/expense\_corrections.py                         |       12 |        0 |    100% |           |
+| src/dinary/api/expense\_corrections.py                         |       13 |        0 |    100% |           |
 | src/dinary/api/expenses.py                                     |       28 |        0 |    100% |           |
 | src/dinary/api/http\_errors.py                                 |        9 |        0 |    100% |           |
 | src/dinary/api/income.py                                       |       26 |        2 |     92% |    40, 52 |
 | src/dinary/api/llm.py                                          |       20 |        0 |    100% |           |
 | src/dinary/api/receipts.py                                     |       58 |        5 |     91% |   108-113 |
-| src/dinary/api/rules.py                                        |       18 |        0 |    100% |           |
+| src/dinary/api/rules.py                                        |       23 |        0 |    100% |           |
 | src/dinary/background/classification/item\_normalizer.py       |       13 |        0 |    100% |           |
 | src/dinary/background/classification/persist.py                |       83 |        1 |     99% |       155 |
 | src/dinary/background/classification/receipt\_classifier.py    |       58 |        0 |    100% |           |
@@ -74,7 +75,7 @@
 | src/dinary\_analytics/refresh.py                               |      100 |        2 |     98% |   50, 157 |
 | src/dinary\_analytics/settings.py                              |       49 |        1 |     98% |        56 |
 | src/dinary\_analytics/views.py                                 |       23 |        1 |     96% |        62 |
-| **TOTAL**                                                      | **5170** |  **647** | **87%** |           |
+| **TOTAL**                                                      | **5193** |  **647** | **88%** |           |
 
 
 ## Setup coverage badge
