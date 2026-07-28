@@ -121,6 +121,18 @@ jobs:
     - name: Install analytics dependencies
       run: uv sync --frozen --group analytics
 
+    # DuckDB downloads sqlite_scanner on the first `ATTACH (TYPE sqlite)`.
+    # Cached + pre-installed here so a stalled download fails this step
+    # instead of hanging inside a test until pytest-timeout kills it.
+    - name: Cache DuckDB extensions
+      uses: actions/cache@v4
+      with:
+        path: ~/.duckdb/extensions
+        key: duckdb-extensions-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+
+    - name: Pre-install DuckDB extensions
+      run: bash scripts/install-duckdb-extensions.sh
+
     - name: Test analytics with pytest and Allure
       run: >-
         python -m pytest

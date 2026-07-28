@@ -30,6 +30,7 @@ A bare `uv sync` is **not** enough to reach a green suite. The full test run and
 
 1. **All dependency groups**: `uv sync --all-groups` — the `analytics` group (duckdb, lmdb, marimo, mcp, altair, polars) is required, or `tests/analytics/` fails to collect and pyrefly reports missing-import errors.
 2. **`zstd` and `sqlite3` CLIs**: the backup/restore tasks and tests shell out to them (`apt-get install -y zstd sqlite3`).
+3. **DuckDB `sqlite_scanner` extension**: DuckDB downloads it on the first `ATTACH (TYPE sqlite)`; uncached, that download can outlast the 60s pytest timeout and the analytics test dies with `RuntimeError: Query interrupted`.
 
 Both are wrapped in the tracked, idempotent script **`scripts/setup-test-env.sh`** — run it once on a fresh session (or whenever deps/binaries are missing) before anything else; never work around the gap by skipping tests. (`.claude/` is git-ignored, so a SessionStart hook can't be committed — this script is the tracked source of truth.)
 

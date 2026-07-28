@@ -10,6 +10,9 @@
 #      tests fail to collect and pyrefly reports missing-import errors.
 #   2. The `zstd` and `sqlite3` CLIs. The backup/restore tasks and their
 #      tests shell out to these real binaries.
+#   3. The DuckDB `sqlite_scanner` extension. DuckDB downloads it on the
+#      first `ATTACH (TYPE sqlite)`; on a machine without it cached that
+#      download can outlast the 60s pytest timeout and kill the test.
 #
 # Idempotent and non-interactive: safe to re-run any time.
 #
@@ -39,5 +42,8 @@ if [ "${#missing[@]}" -gt 0 ]; then
     exit 1
   fi
 fi
+
+# 3. DuckDB extensions, so no analytics test blocks on a runtime download.
+bash "$(dirname "$0")/install-duckdb-extensions.sh"
 
 echo "setup-test-env: environment ready"

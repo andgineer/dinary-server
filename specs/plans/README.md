@@ -22,10 +22,11 @@ means writing it twice. #1 also supplies the dirty flag that #2's cache-clearing
 shipped alone, the drill-down follows the 24 h TTL and can display exactly the stale numbers #1
 exists to fix.
 
-**#3 floats.** It touches only `views/LLMView.vue`, `components/ProviderCard.vue`,
-`components/ReceiptCascadeCard.vue` and two new composables — no overlap with #1 or #2 in code,
-tests or specs. It is the smallest of the three and the natural candidate to hand to a second
-person or to land first as a warm-up.
+**#3 floats.** It touches `src/dinary/api/controllers/llm.py`, `views/LLMView.vue`,
+`components/ProviderCard.vue` and one new composable — no overlap with #1 or #2 in code, tests or
+specs (they change `src/dinary/api/analytics.py`, it changes the LLM controller). It is the
+smallest of the three and the natural candidate to hand to a second person or to land first as a
+warm-up.
 
 One shared file to watch: `specs/reference/pwa-analytics.md` is edited by both #1 (the
 "Client cache" section) and #2 (the event-detail endpoint). Different sections, but separate
