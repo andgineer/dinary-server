@@ -8,6 +8,7 @@ from invoke import task
 
 from tasks.devtools.constants import (
     _REMOTE_DB_PATH,
+    _REMOTE_LITESTREAM_SHADOW_PATH,
     BACKUP_FILENAME_PREFIX,
     BACKUP_FILENAME_SUFFIX,
     BACKUP_RCLONE_PATH,
@@ -322,6 +323,8 @@ def replica_resync(c):
     """
     print("=== Stopping litestream on VM1 ===")
     ssh_run(c, "sudo systemctl stop litestream")
+    print("=== Wiping stale LTX shadow tree on VM1 ===")
+    ssh_run(c, f"rm -rf {_REMOTE_LITESTREAM_SHADOW_PATH}")
     print(f"=== Wiping stale LTX tree on {replica_host()} ===")
     ssh_replica(c, f"rm -rf {REPLICA_LITESTREAM_DIR}/{REPLICA_DB_NAME}")
     print("=== Starting litestream on VM1 (will push fresh snapshot) ===")

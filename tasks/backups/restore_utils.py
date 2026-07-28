@@ -8,6 +8,7 @@ from pathlib import Path
 
 from tasks.backups.backup_snapshots import sqlite_row_count
 from tasks.devtools.constants import (
+    _REMOTE_LITESTREAM_SHADOW_PATH,
     REPLICA_DB_NAME,
     REPLICA_LITESTREAM_DIR,
     VM1_LITESTREAM_KEY_PATH,
@@ -60,14 +61,16 @@ def local_replica_resync(c) -> None:
     """Resync VM2 from VM1 without routing through the developer machine.
 
     Equivalent to ``inv replica-resync`` but runs entirely on VM1:
-    stops the local litestream service, wipes the stale LTX tree on
-    VM2 via the key litestream already uses for SFTP, then restarts.
+    stops the local litestream service, wipes the stale LTX trees on
+    both sides, then restarts.
     Called automatically by restore tasks when litestream is active.
     """
     vm2 = _parse_vm2_ssh_target()
     replica_dir = f"{REPLICA_LITESTREAM_DIR}/{REPLICA_DB_NAME}"
     print("=== Stopping litestream on VM1 ===")
     c.run("sudo systemctl stop litestream")
+    print("=== Wiping stale LTX shadow tree on VM1 ===")
+    c.run(f"rm -rf {_REMOTE_LITESTREAM_SHADOW_PATH}")
     print(f"=== Wiping stale LTX tree on {vm2} ===")
     c.run(f"ssh -i {VM1_LITESTREAM_KEY_PATH} {vm2} 'rm -rf {replica_dir}'")
     print("=== Starting litestream on VM1 (will push fresh snapshot) ===")

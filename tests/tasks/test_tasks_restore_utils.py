@@ -99,40 +99,61 @@ class TestLocalReplicaResync:
         monkeypatch.setattr(ru, "_LITESTREAM_CONFIG", cfg)
         return cfg
 
+    @staticmethod
+    def _vm2_wipe(c) -> str:
+        return next(
+            call_args[0][0]
+            for call_args in c.run.call_args_list
+            if "rm -rf" in call_args[0][0] and "ssh" in call_args[0][0]
+        )
+
+    @staticmethod
+    def _vm1_wipe(c) -> str:
+        return next(
+            call_args[0][0]
+            for call_args in c.run.call_args_list
+            if "rm -rf" in call_args[0][0] and "ssh" not in call_args[0][0]
+        )
+
     def test_stop_wipe_start_sequence(self, _config):
-        """Resync must stop litestream, wipe VM2, then start litestream — in that order."""
+        """Resync must stop litestream, wipe both sides, then start litestream — in that order."""
         c = MagicMock()
         ru.local_replica_resync(c)
         cmds = [call_args[0][0] for call_args in c.run.call_args_list]
         stop_idx = next(i for i, cmd in enumerate(cmds) if "stop litestream" in cmd)
-        wipe_idx = next(i for i, cmd in enumerate(cmds) if "rm -rf" in cmd)
+        wipe_idxs = [i for i, cmd in enumerate(cmds) if "rm -rf" in cmd]
         start_idx = next(i for i, cmd in enumerate(cmds) if "start litestream" in cmd)
-        assert stop_idx < wipe_idx < start_idx
+        assert len(wipe_idxs) == 2
+        assert stop_idx < min(wipe_idxs)
+        assert max(wipe_idxs) < start_idx
+
+    def test_wipes_vm1_shadow_tree(self, _config):
+        """Wiping only VM2 strands VM1's shadow tree at the old txids and the replica stays broken."""
+        c = MagicMock()
+        ru.local_replica_resync(c)
+        assert ru._REMOTE_LITESTREAM_SHADOW_PATH in self._vm1_wipe(c)
+
+    def test_vm1_shadow_wipe_runs_locally_not_over_ssh(self, _config):
+        """local_replica_resync already runs on VM1 — the shadow wipe must not be routed to VM2."""
+        c = MagicMock()
+        ru.local_replica_resync(c)
+        assert "ssh" not in self._vm1_wipe(c)
 
     def test_wipe_uses_litestream_key(self, _config):
         """The SSH wipe command must use VM1_LITESTREAM_KEY_PATH, not a different key."""
         c = MagicMock()
         ru.local_replica_resync(c)
-        wipe_cmd = next(
-            call_args[0][0] for call_args in c.run.call_args_list if "rm -rf" in call_args[0][0]
-        )
-        assert ru.VM1_LITESTREAM_KEY_PATH in wipe_cmd
+        assert ru.VM1_LITESTREAM_KEY_PATH in self._vm2_wipe(c)
 
     def test_wipe_targets_correct_vm2_host(self, _config):
         """The SSH wipe command must target the host parsed from litestream.yml."""
         c = MagicMock()
         ru.local_replica_resync(c)
-        wipe_cmd = next(
-            call_args[0][0] for call_args in c.run.call_args_list if "rm -rf" in call_args[0][0]
-        )
-        assert "ubuntu@replica.example.com" in wipe_cmd
+        assert "ubuntu@replica.example.com" in self._vm2_wipe(c)
 
     def test_wipe_removes_replica_db_dir(self, _config):
         """The wipe must target REPLICA_LITESTREAM_DIR/REPLICA_DB_NAME, not a broader path."""
         c = MagicMock()
         ru.local_replica_resync(c)
-        wipe_cmd = next(
-            call_args[0][0] for call_args in c.run.call_args_list if "rm -rf" in call_args[0][0]
-        )
         expected_path = f"{ru.REPLICA_LITESTREAM_DIR}/{ru.REPLICA_DB_NAME}"
-        assert expected_path in wipe_cmd
+        assert expected_path in self._vm2_wipe(c)

@@ -80,14 +80,35 @@ def _healthcheck_last_expense_info(results: dict[str, str]) -> None:
         print(f"OK: yesterday total {totals}")
 
 
+_LITESTREAM_BENIGN_STARTUP_ERROR = "page size not initialized yet"
+
+
 def _litestream_error_check_command() -> str:
+    """Litestream logs to stdout, so journald stamps every line PRIORITY=6 regardless of the
+    ``level=`` the message carries — a ``-p err`` filter can never match. Scoping to the current
+    InvocationID keeps a fixed fault from being reported for 24h after the restart that fixed it.
+    The L9 compaction monitor always loses a startup race with the first DB read, so its one
+    ``page size not initialized yet`` error per boot is expected and must not fail the check.
+    """
     return (
-        "journalctl -u litestream --since '24 hours ago' -p err --no-pager -q 2>/dev/null || true"
+        "journalctl -u litestream --since '24 hours ago'"
+        ' _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value litestream)"'
+        " --no-pager -q 2>/dev/null"
+        f" | awk '/level=ERROR/ && !/{_LITESTREAM_BENIGN_STARTUP_ERROR}/"
+        " {n++; last=$0} END {print n+0; if (n) print last}' || true"
     )
 
 
-def _parse_litestream_errors(output: str) -> list[str]:
-    return output.strip().splitlines() if output.strip() else []
+def _parse_litestream_errors(output: str) -> tuple[int, str]:
+    """Parse the awk summary into (error_count, last_error_line)."""
+    lines = output.strip().splitlines()
+    if not lines:
+        return 0, ""
+    try:
+        count = int(lines[0].strip())
+    except ValueError:
+        return 0, ""
+    return count, lines[1].strip() if len(lines) > 1 else ""
 
 
 def _build_replica_sync_script() -> str:
@@ -239,12 +260,12 @@ def healthcheck(c, remote=False):  # noqa: ARG001
                 print(f"FAIL: service {svc} is {state!r}", file=sys.stderr)
                 sys.exit(1)
             print(f"OK: service {svc} active")
-        ltx_errors = _parse_litestream_errors(
+        ltx_error_count, ltx_last_error = _parse_litestream_errors(
             ssh_capture(c, _litestream_error_check_command()),
         )
-        if ltx_errors:
+        if ltx_error_count:
             print(
-                f"FAIL: litestream logged {len(ltx_errors)} error(s) in last 24h: {ltx_errors[-1]}",
+                f"FAIL: litestream logged {ltx_error_count} error(s) in last 24h: {ltx_last_error}",
                 file=sys.stderr,
             )
             sys.exit(1)

@@ -1,4 +1,4 @@
-# Plan: PWA stats refresh and per-event drill-down
+# Plan: PWA stats refresh, per-event drill-down, LLM view cleanup
 
 ## Task
 
@@ -7,6 +7,9 @@
    fully processed all receipts.
 2. Clicking an event shows that event's stats: how much was spent per category, plus the
    spend total for each of the last few days.
+3. The LLM view drops the deploy-path hint from the pool header and starts showing the two
+   fields the status API already returns but the UI discards: the cooldown deadline and the
+   time of the last call.
 
 ## Context (current state)
 
@@ -96,7 +99,80 @@ Reuse `_fmt` and `settings.accounting_currency`; for `date_label` use a short da
     libs — the project has none), sorted descending.
   - By day — "day · amount" rows for the last few days.
 
-## Part 3. Tests (mandatory, same session)
+## Part 3. LLM view: drop the path hint, surface cooldown and last-call time
+
+Pure frontend — `GET /api/llm/status` already returns everything needed
+(`_snapshot_to_dict` in `src/dinary/api/controllers/llm.py:39-53` emits `cooldown_until` and
+`last_at`; neither reaches the screen). No controller or SQL changes.
+
+### 3.1 Remove the preset-path hint from the pool header
+- `webapp/src/views/LLMView.vue:42` — delete
+  `<span class="pool-hint">from .deploy/llms.toml</span>`, and the `.pool-hint` CSS rule
+  (`LLMView.vue:95-101`) with it.
+- No other CSS change: `.pool-header` is `justify-content: space-between`, so with the hint
+  gone the remaining two children (label, refresh `IconBtn`) still sit left/right. The
+  `margin-right: auto` that did that job lived on `.pool-hint` and goes away with it.
+- Keep the path in the empty state (`LLMView.vue:67`). That is the one state where it is
+  actionable — the pool is empty and the operator has to fill the preset file.
+
+Rationale: `.deploy/` is gitignored and lives on the server, so the path is unreachable from
+the PWA; the read-only nature of the pool is already conveyed by the absence of an add
+button. The hint is deploy detail leaking into the UI.
+
+### 3.2 Shared time helpers (no duplication)
+`formatRelative` currently exists only as a local function inside
+`webapp/src/components/ReceiptCascadeCard.vue:34-43`. Extract, do not copy (CLAUDE.md forbids
+duplicating logic to avoid an import):
+
+- New `webapp/src/utils/time.js` (new directory) exporting:
+  - `formatRelative(iso, now)` — moved verbatim from `ReceiptCascadeCard`, with `Date.now()`
+    replaced by an injected `now` (default `Date.now()`) so the ticking ref drives it.
+  - `formatRemaining(iso, now)` — the mirror for a future deadline: `"<1 min"`, `"Nm"`,
+    `"Nh"`; returns `null` once the deadline has passed.
+  - Both keep the existing SQLite-timestamp tolerance (`iso.includes("T") ? iso :
+    iso.replace(" ", "T") + "Z"`).
+- `ReceiptCascadeCard.vue` — delete the local `formatRelative`, import it from the new module.
+  `formatDateTime` stays local (single user).
+- New `webapp/src/composables/useNow.js` — `useNow(intervalMs = 30_000)` returns a `now` ref
+  of epoch ms, ticking on `setInterval`, cleared in `onBeforeUnmount`.
+
+`useNow` is needed because `LLMView`'s existing 30 s timer (`LLMView.vue:26-28`) only refetches
+when `llmStore.dirtyFlag` is set; without an independent tick a countdown rendered from a
+static `cooldown_until` would freeze on screen.
+
+### 3.3 `ProviderCard`: cooldown deadline
+- `webapp/src/components/ProviderCard.vue` — add a `now` prop (Number, required) and render
+  the remaining cooldown next to the status badge when `provider.status === 'cooling'`:
+  badge text stays `cooling down`, a sibling `.cooldown-left` span shows
+  `formatRemaining(provider.cooldown_until, now)`.
+- Render nothing extra when `cooldown_until` is null or already in the past — `formatRemaining`
+  returns `null` and the span is `v-if`-ed out. The status badge keeps its own precedence
+  (`_derive_status`: disabled → no_key → cooling → available), so this is display-only.
+- `LLMView.vue` — `const now = useNow()`, pass `:now="now"` to every `ProviderCard`.
+
+Rationale: `cooling down` with no deadline is indistinguishable from "broken". The deadline is
+what tells the user to wait instead of intervening.
+
+### 3.4 `ProviderCard`: when the last call happened
+- The meta row (`ProviderCard.vue:53-58`) currently renders `412 calls · last: ok`. Append the
+  relative time from `provider.last_at`: `412 calls · last: ok · 3m ago`.
+- `v-if` on `provider.last_at` — a provider with `call_count === 0` has none.
+- Keep the existing `[data-status]` colouring on `.last-status`; the timestamp is a separate
+  muted span so an error status stays visually distinct.
+
+Rationale: `last: ok` from two weeks ago and `last: ok` from a minute ago look identical today,
+yet they are "the pipeline is dead" vs "the pipeline is working".
+
+### 3.5 Explicitly out of scope
+- **Which provider is next in the failover order.** The most valuable missing signal, but
+  `llmbroker.Optimizer` exposes no routing-order accessor (`wilson_bound`, `is_demoted`,
+  `load_scores` only). Deriving it in dinary from preset order + status would duplicate broker
+  logic and drift. Needs an upstream llmbroker addition — separate task.
+- `health.strategy` (`"failover"`, computed in `llm_status`) stays unrendered: the bare word
+  tells the user nothing.
+- `base_url` stays unrendered.
+
+## Part 4. Tests (mandatory, same session)
 
 Python (`tests/api/test_api_analytics.py`, class `TestAnalyticsEventDetail`):
 - category breakdown sorted descending and amounts correct;
@@ -113,12 +189,38 @@ Frontend (`webapp/tests/`):
 - update `store-income.test.js` for `markDirty` instead of `invalidate`.
 - cover the event detail in the component in a new/existing view test.
 
-## Part 4. Specs
+Frontend, Part 3 (`webapp/tests/`):
+- new `utils-time.test.js`: `formatRelative` boundaries (just now / m / h / d) and the
+  SQLite-timestamp form; `formatRemaining` returns `null` for a past deadline and the right
+  bucket for future ones.
+- new `composable-use-now.test.js`: the ref advances on fake timers and the interval is cleared
+  on unmount.
+- extend `component-provider-card.test.js`: `cooling` + future `cooldown_until` renders the
+  remaining time; past/null `cooldown_until` renders no extra span; `last_at` renders the
+  relative suffix; `call_count === 0` with no `last_at` renders neither.
+- extend/add an `LLMView` test: the header no longer contains `.pool-hint` or the text
+  `.deploy/llms.toml`, while the empty state still does.
+- `ReceiptCascadeCard` must stay green after `formatRelative` moves out — check
+  `webapp/tests/` for existing coverage and extend it if the relative-time line is untested.
+
+No new Python tests for Part 3 — no backend change.
+
+## Part 5. Specs
 - `specs/reference/pwa-analytics.md`: rewrite the "Client cache" section for the dirty flag
   (expense/income/receipt, dirty-until-processed); add the event-detail endpoint and describe
   the "by category" and "by recent days" breakdowns.
 - `specs/reference/frontend-cache.md`: add an "Analytics store dirty-flag sources" section
   modelled on review/llm.
+- `specs/ui/screens.md`, `## LLM view` — three fixes, all from Part 3:
+  - drop `from llms.toml` from the mockup header (`:337`);
+  - state in the `### ProviderCard rules` list that a cooling provider shows how long the
+    cooldown still has to run, and that the usage line carries the time of the last call;
+  - the `RECEIPT QUEUE` strip (mockup `:333`, section `### Receipt queue strip` at `:357`) is
+    documented under `## LLM view` but implemented in `ReviewView.vue:188-199` — move the
+    section and the mockup rows into the Review view section. Pre-existing divergence, fixed
+    here because the same mockup is being edited anyway.
+- `specs/reference/llmbroker-integration.md`, `## Admin screen`: the screen's inventory of what
+  it shows per provider gains the cooldown remainder and the last-call time.
 
 (Specs — current state and rules only, no signatures/field names — per CLAUDE.md.)
 
@@ -127,17 +229,22 @@ Frontend (`webapp/tests/`):
 2. Add `markDirty` at every point (flushQueue, flushReceiptQueue, review mutations + queue).
 3. Backend detail endpoint + 2 SQL files + tests.
 4. Event-expansion UI + store detail + tests.
-5. Update the specs.
-6. `scripts/setup-test-env.sh` (if needed), then the gate: `uv run inv pre` → "All checks
+5. LLM view: extract `utils/time.js` + `useNow`, drop the pool hint, add the cooldown and
+   last-call lines + tests. Independent of steps 1-4 — can land first or in its own commit.
+6. Update the specs.
+7. `scripts/setup-test-env.sh` (if needed), then the gate: `uv run inv pre` → "All checks
    passed!" and `uv run pytest` → `N passed`, plus a green `cd webapp && npm test`.
    `inv pre` after every batch.
 
 Affected files: `stores/analytics.js`, `stores/income.js`, `stores/review.js`,
 `composables/flushQueue.js`, `composables/flushReceiptQueue.js`, `views/AnalyticsView.vue`,
-`api/analytics.js`, `src/dinary/api/analytics.py`, 2 new `.sql` files, tests (py + webapp),
-2 specs.
+`api/analytics.js`, `src/dinary/api/analytics.py`, 2 new `.sql` files, `views/LLMView.vue`,
+`components/ProviderCard.vue`, `components/ReceiptCascadeCard.vue`, new `utils/time.js`, new
+`composables/useNow.js`, tests (py + webapp), 4 specs.
 
 ## Open questions (defaults)
 - "last few days" = the event's last 7 days with spend (not global).
 - Detail UI = inline expansion (accordion) in the row. Alternative — a bottom sheet
   (`BaseSheet`), as used elsewhere in the app.
+- Cooldown countdown granularity = 30 s (`useNow` default), matching the view's existing poll
+  interval. A finer tick buys nothing on a minutes-long cooldown.

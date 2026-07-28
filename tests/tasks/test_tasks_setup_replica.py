@@ -525,6 +525,28 @@ class TestSetupResyncTask:
         assert tasks.devtools.constants.REPLICA_LITESTREAM_DIR in wipe_call
         assert tasks.devtools.constants.REPLICA_DB_NAME in wipe_call
 
+    def test_wipes_shadow_tree_on_vm1(self, _spy):
+        """The shadow tree holds txids from the pre-restore DB. Wiping only VM2 leaves
+        litestream asking for segments that tree never had, so every sync keeps failing."""
+        shadow = tasks.devtools.constants._REMOTE_LITESTREAM_SHADOW_PATH
+        tasks.replica_resync.body(MagicMock())
+        assert any("rm -rf" in c and shadow in c for c in _spy.ssh_calls), (
+            "must wipe the VM1 shadow tree via ssh_run"
+        )
+        assert not any(shadow in c for c in _spy.replica_calls), (
+            "the VM1 shadow path must not be wiped on VM2"
+        )
+
+    def test_wipes_both_sides_between_stop_and_start(self, _spy):
+        """Either wipe landing outside the stop/start window races the running replicator."""
+        tasks.replica_resync.body(MagicMock())
+        stop_idx = next(i for i, c in enumerate(_spy.ssh_calls) if "systemctl stop litestream" in c)
+        start_idx = next(
+            i for i, c in enumerate(_spy.ssh_calls) if "systemctl start litestream" in c
+        )
+        shadow_idx = next(i for i, c in enumerate(_spy.ssh_calls) if "rm -rf" in c)
+        assert stop_idx < shadow_idx < start_idx
+
     def test_starts_litestream_on_vm1_after_wipe(self, _spy):
         """Litestream must restart on VM1 AFTER the LTX tree is wiped —
         starting before the wipe means the replicator sees existing LTX

@@ -154,6 +154,12 @@ BACKUP_RETENTION_MONTHLY = 12
 #: Remote path of the live SQLite ledger file.
 _REMOTE_DB_PATH = "/home/ubuntu/dinary/data/dinary.db"
 
+# Litestream's local LTX shadow tree on VM1, named after the DB file. It holds txids from
+# whichever database it was built against, so replacing the DB strands it: litestream then
+# asks for segments the tree never had and every sync fails. A resync must clear this side
+# too — wiping only VM2 leaves the stale tree in place and the replica stays broken.
+_REMOTE_LITESTREAM_SHADOW_PATH = "/home/ubuntu/dinary/data/.dinary.db-litestream"
+
 # Re-export so consumers of this module get the full set in one import.
 __all__ = [
     "ALLOWED_VERSION_TYPES",
@@ -185,4 +191,5 @@ __all__ = [
     "REPO_URL",
     "VALID_TUNNELS",
     "_REMOTE_DB_PATH",
+    "_REMOTE_LITESTREAM_SHADOW_PATH",
 ]

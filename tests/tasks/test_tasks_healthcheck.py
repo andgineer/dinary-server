@@ -101,8 +101,17 @@ class TestLitestreamErrorCheckCommand:
     def test_targets_litestream_service(self):
         assert "litestream" in _litestream_error_check_command()
 
-    def test_filters_error_priority(self):
-        assert "-p err" in _litestream_error_check_command()
+    def test_matches_message_text_not_journald_priority(self):
+        """Litestream logs to stdout, so journald tags every line PRIORITY=6 — `-p err` is blind."""
+        cmd = _litestream_error_check_command()
+        assert "level=ERROR" in cmd
+        assert "-p err" not in cmd
+
+    def test_scoped_to_current_invocation(self):
+        assert "_SYSTEMD_INVOCATION_ID" in _litestream_error_check_command()
+
+    def test_ignores_benign_startup_compaction_error(self):
+        assert "page size not initialized yet" in _litestream_error_check_command()
 
     def test_covers_24h_window(self):
         assert "24 hours ago" in _litestream_error_check_command()
@@ -112,23 +121,27 @@ class TestLitestreamErrorCheckCommand:
 @allure.feature("Healthcheck")
 @allure.story("Litestream errors")
 class TestParseLitestreamErrors:
-    def test_empty_output_returns_empty_list(self):
-        assert _parse_litestream_errors("") == []
+    def test_empty_output_returns_zero(self):
+        assert _parse_litestream_errors("") == (0, "")
 
-    def test_whitespace_only_returns_empty_list(self):
-        assert _parse_litestream_errors("  \n  ") == []
+    def test_whitespace_only_returns_zero(self):
+        assert _parse_litestream_errors("  \n  ") == (0, "")
+
+    def test_zero_count_returns_no_error(self):
+        assert _parse_litestream_errors("0") == (0, "")
 
     def test_single_error_line(self):
-        out = "Jun 06 10:00:00 vm1 litestream[1]: non-contiguous transaction files"
-        assert len(_parse_litestream_errors(out)) == 1
+        out = "1\nJun 06 10:00:00 vm1 litestream[1]: level=ERROR non-contiguous transaction files"
+        count, last = _parse_litestream_errors(out)
+        assert count == 1
+        assert "non-contiguous" in last
 
-    def test_multiple_error_lines(self):
-        out = (
-            "Jun 06 10:00:00 vm1 litestream[1]: error A\nJun 06 10:01:00 vm1 litestream[1]: error B"
+    def test_large_count_with_last_line(self):
+        out = "86415\nJul 28 14:21:06 vm1 litestream[1]: level=ERROR monitor error"
+        assert _parse_litestream_errors(out) == (
+            86415,
+            "Jul 28 14:21:06 vm1 litestream[1]: level=ERROR monitor error",
         )
-        assert len(_parse_litestream_errors(out)) == 2
 
-    def test_last_line_is_last_error(self):
-        out = "error A\nerror B"
-        errors = _parse_litestream_errors(out)
-        assert errors[-1] == "error B"
+    def test_non_numeric_first_line_is_ignored(self):
+        assert _parse_litestream_errors("bash: journalctl: not found") == (0, "")
