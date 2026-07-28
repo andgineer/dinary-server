@@ -63,7 +63,10 @@ These rules come from `AGENTS.md` and supplement the defaults in this file.
 - **No re-export patterns** — when a symbol moves, update importers to point at the new module instead of leaving a shim re-export. This does not forbid importing a shared helper; never duplicate logic across modules to "avoid" an import.
 
 ### Plan files
-- Never reference `.plans/*.md` files or step numbers from plans inside code comments or docstrings. Plans are ephemeral; the code is the source of truth.
+- **Location: `specs/plans/` — always.** Before creating a plan file, check the path starts with `specs/plans/`. Never `.plans/`, never the repo root, never any hidden or git-ignored directory. A plan outside `specs/plans/` is a bug: move it there in the same session.
+- **Language: English — always.** Headings, tables, and prose included. A plan written while the conversation is in Russian (or any other language) is still written in English; only the reply to the user follows the user's language.
+- A plan that is fully implemented and merged is deleted, not archived. Before deleting, move anything spec-worthy (architectural decisions, business requirements) into `specs/` — never implementation details.
+- Never reference plan files or step numbers from plans inside code comments or docstrings. Plans are ephemeral; the code is the source of truth.
 
 ### Spec files
 - Specs in `specs/` capture architectural decisions and business requirements only — not implementation details.

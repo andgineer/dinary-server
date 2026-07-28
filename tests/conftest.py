@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from dinary import main
 from dinary.adapters.rates import helpers
 from dinary.config import settings
 from dinary.db import category_seed, db_migrations, storage
@@ -68,6 +69,14 @@ def _empty_llm_provider_preset(monkeypatch, tmp_path):
     operator's real ``.deploy/llms.toml`` never interferes. Tests that need a
     populated pool override ``settings.llm_providers_file`` themselves."""
     monkeypatch.setattr(settings, "llm_providers_file", tmp_path / "no-llms.toml")
+
+
+@pytest.fixture(autouse=True)
+def _no_operator_dotenv(monkeypatch):
+    """The lifespan bootstraps API keys from the operator's real ``.deploy/.env``;
+    on a developer machine that silently seeds provider keys tests expect to be
+    absent. Tests that want a key set it via ``monkeypatch.setenv``."""
+    monkeypatch.setattr(main, "load_dotenv", lambda *args, **kwargs: None)
 
 
 @pytest.fixture(autouse=True)

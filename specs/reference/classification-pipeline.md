@@ -74,8 +74,9 @@ differs from the count sent. A fully assigned response at any confidence level
 is not a failure.
 
 On execution failure the pipeline retries with a different provider, up to
-three attempts bounded by the number of configured providers. Each failure is
-reported back to the provider so its quality-failure counter is incremented.
+three attempts bounded by the number of configured providers. Both outcomes are
+reported back as model quality — a failure negatively, an accepted response
+positively (see [llmbroker-integration.md](llmbroker-integration.md)).
 If all attempts fail, the job enters the frequency-based exhaustion fallback
 rather than being poisoned.
 

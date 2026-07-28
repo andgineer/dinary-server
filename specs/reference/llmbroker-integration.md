@@ -74,11 +74,15 @@ Quality feedback for receipt classification flows back to the model that did the
 - A malformed reply counts as a negative rating.
 - A user category correction rates the model that created the corrected rule, whenever
   the correction happens — days later, across restarts. The rule remembers which model
-  created it. Correcting to one of the alternatives that model itself proposed earns
+  created it. Re-selecting the category the model already chose confirms it and is not
+  rated at all. Correcting to one of the alternatives that model itself proposed earns
   partial credit; any other target is a full negative. Because the correction flips the
   rule away from its llm origin, a second correction of the same rule rates nothing.
 
 Rules created directly from user corrections carry no model and are never rated.
+
+Rating is a side effect, never a precondition: a failure to record one is logged and
+the correction stands.
 
 ## Version pinning
 
