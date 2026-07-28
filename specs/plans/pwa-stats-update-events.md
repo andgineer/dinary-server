@@ -40,6 +40,13 @@ DB schema: `events(id,name,date_from,date_to,…)`,
 returns (`api/controllers/rules.py:209` → `classification_job_counts`,
 `src/dinary/db/receipts.py:305`) — import that helper, do not re-query.
 
+**Read the queue counts first, before the aggregates.** `get_db` yields a connection in
+autocommit (`db/storage.py:291-297`), so every SELECT in the handler is its own snapshot. With
+the counts read last, a job that commits between the aggregate reads and the count read gives
+totals without the new expense *and* an empty queue → `stampFresh()` → the flag is cleared on
+data that is already stale. Reading the counts first inverts the race into the harmless
+direction: a stale-but-busy reading costs one extra refetch.
+
 This is what makes the rule hold. Review can stay dirty-until-processed only because its *own*
 response carries the queue, so `loadNextPage` re-marks itself on every fetch
 (`stores/review.js:100-103`). Analytics has no such signal and — per 1.3 — no background probe,
@@ -74,15 +81,21 @@ close.
   reused as-is: an object written by the old build carries an extra `lastFetched` field that
   the new reader ignores, and the missing `fetchedKey` makes `isStale()` true → one refetch.
 - Replace the TTL check in `fetchAll` with `isStale()`. After a successful fetch —
-  `writeCache(...)`, then **`stampFresh()` only when `pending`, `in_progress` and `sleeping`
-  are all zero (`poisoned` deliberately not counted — see 1.0); otherwise `bumpFetchTime()`**,
-  which records the fetch but leaves the dirty flag up.
-  `useStaleCache` already exports `bumpFetchTime` for exactly this (currently unused in `src/`,
-  covered by `composable-stale-cache.test.js:74`).
+  `writeCache(...)`, then **`stampFresh()` unconditionally, followed by `markDirty()` when any
+  of `pending`, `in_progress`, `sleeping` is non-zero** (`poisoned` deliberately not counted —
+  see 1.0). This is `review.loadNextPage`'s exact shape (`stores/review.js:98-103`).
+  **Not `bumpFetchTime()`.** That call only writes `lastFetchedAt`; it leaves `dirtyFlag`
+  untouched, which re-marks nothing when the flag was not already up. On a cold start (empty
+  localStorage, or a receipt scanned on another device) the sequence is
+  `isStale()` true because `lastFetchedAt` is null → fetch → queue busy → `bumpFetchTime()` →
+  `dirtyFlag` still `false` → `isStale()` false → the next open never refetches. That is the
+  very hole 1.0 exists to close. `stampFresh()` + `markDirty()` reaches the same end state
+  (`lastFetchedAt` written, flag up) and works regardless of the flag's prior value, so
+  `bumpFetchTime` stays unused by any store.
 - Rename the method to `loadIfNeeded()` (consistent with review/income); export `markDirty`.
 - Drop `invalidate()`; use `markDirty()` instead.
 
-### 1.2 Mark dirty at every point that changes expenses/incomes/receipts
+### 1.2 Mark dirty at every point that changes what the stats page shows
 
 | Trigger | File | Action |
 |---|---|---|
@@ -91,6 +104,13 @@ close.
 | Server receipt queue still draining | `stores/review.js` `loadNextPage` | belt-and-braces only, it fires just when review happens to be fetching; the rule itself is carried by 1.0. **Not inside the existing `if (q.pending>0 …)` block** — that one also fires on `poisoned`, which 1.0 rules out. Add a separate `if (q.pending > 0 \|\| q.in_progress > 0 \|\| q.sleeping > 0) useAnalyticsStore().markDirty()`, leaving review's own condition untouched |
 | Category/expense edit, delete, stuck-receipt resolution, receipt delete | `stores/review.js` (`correct`, `updateExpense`, `deleteExpense`, `resolveStuckReceipt`, `deleteReceipt`) | `useAnalyticsStore().markDirty()` |
 | Income add/patch/remove | `stores/income.js` | replace 3× `useAnalyticsStore().invalidate()` → `markDirty()` |
+| Event added, renamed, re-dated or deleted | `stores/catalog.js` (`add`, `patch`, `remove`) | `if (kind === "event") useAnalyticsStore().markDirty()` — one line in each of the three generic dispatchers (`catalog.js:561,578,591`) |
+
+The event row is the one catalog entity the stats page renders directly: a rename changes the
+displayed name, a date shift changes both `date_range` and the `open` pill and can move the
+event in or out of the 12-month window in `analytics_events.sql`, and Part 2 makes events
+clickable on top of that. Groups and tags need no marking — they surface only through
+`trends[].basket_name`, which is recomputed from the same fetch.
 
 **Not `confirmAll`.** Bulk rule confirmation (`api/controllers/rules.py:128-142`) only writes
 `confidence_level = 4` on the rules and their expenses — no amount, category, event or date
@@ -107,10 +127,10 @@ the trend baskets.)
   requirement (deliberate scope narrowing).
 
 Result: after an expense/income is added or a receipt is scanned the store is marked dirty. A
-fetch taken while the server queue is still draining writes the data but keeps the flag up
-(1.0), so the next stats-page open refetches; the first fetch that sees a drained queue clears
-the flag — the review semantics minus the terminal `poisoned` bucket, and independent of
-whether review was ever opened.
+fetch taken while the server queue is still draining writes the data and immediately re-marks
+the flag (1.0), so the next stats-page open refetches; the first fetch that sees a drained queue
+leaves the flag clear — the review semantics minus the terminal `poisoned` bucket, and
+independent of whether review was ever opened or whether the flag was up before the fetch.
 
 Cost: while receipts are in flight every stats-page open costs one extra request on the next
 open. In the normal case that ends when the queue drains. It is *not* strictly bounded: a
@@ -130,12 +150,18 @@ New route in `src/dinary/api/analytics.py`, 404 when the event does not exist. R
 ```
 
 `total` is the `_fmt`-formatted string, as everywhere else in this endpoint family. **`share`
-is a separate float in 0…1** — the row's amount over the largest row's amount. Without it the
-proportional bar in 2.2 has no numeric input: the frontend would have to strip the thousands
-spaces out of `total` and parse back a value `_fmt` already rounded. Computing the ratio
-server-side from the raw `SUM(amount)`, before formatting, is both cheaper and exact.
-(`currency` is repeated per row on purpose — it matches the shape `events[]` already uses in
-the summary response.)
+is a separate float in 0…1 — the row's amount over the event total**, i.e. an actual share, not
+a bar width. Without it the proportional bar in 2.2 has no numeric input: the frontend would
+have to strip the thousands spaces out of `total` and parse back a value `_fmt` already rounded.
+Computing the ratio server-side from the raw `SUM(amount)`, before formatting, is both cheaper
+and exact.
+
+The bar in 2.2 is full-width for the top row, so its width is `share / categories[0].share` —
+the rows are sorted descending, so `categories[0]` is the largest. That is one float division on
+data the view already holds; normalising server-side against the largest row instead would put
+a presentation-derived number behind a field named `share`, which every later reader would
+misread as a share of the total. (`currency` is repeated per row on purpose — it matches the
+shape `events[]` already uses in the summary response.)
 
 Two new SQL files in `src/dinary/db/sql/`:
 - `analytics_event_categories.sql` — `expenses JOIN categories LEFT JOIN category_groups
@@ -171,8 +197,9 @@ Reuse `_fmt` and `settings.accounting_currency`; for `date_label` use a short da
   Important: use a separate `expandedEventId` state for expansion — the `ev.open` field is
   already taken (it means "the event is still running") and must not be conflated. On expand:
   fetch the detail (skeleton while loading), then two blocks styled like the current cards:
-  - By category — "category · amount" rows with a proportional bar whose width comes straight
-    from `share` (inline CSS, no third-party libs — the project has none), sorted descending.
+  - By category — "category · amount" rows with a proportional bar sized `share /
+    categories[0].share` (inline CSS, no third-party libs — the project has none), sorted
+    descending.
   - By day — "day · amount" rows for the last few days. Give the block an explicit
     "last 7 days" heading: `days` is capped at 7 rows, so for a longer event it does not add up
     to the event total in the row above, and an unlabelled block reads as a bug.
@@ -182,6 +209,10 @@ Reuse `_fmt` and `settings.accounting_currency`; for `date_label` use a short da
 - Offline/error: `eventDetails` is memory-only, so an expanded row on a cold offline start has
   nothing to show and no way to fetch. Render an explicit "offline" / "failed to load" line in
   the panel — never a skeleton that spins forever.
+- Empty: an event with no expenses is a normal row, not an edge case — `analytics_events.sql`
+  LEFT JOINs the expenses, so a trip created in advance sits in the list with a `0` total. Both
+  breakdowns come back empty for it; render a single "no expenses yet" line instead of two
+  headed blocks with nothing under them.
 
 ## Part 3. LLM view: drop the path hint, surface cooldown and last-call time
 
@@ -252,6 +283,12 @@ has `status === 'cooling'` and a `cooldown_until` that has passed. One condition
 watcher, and it reconciles `status`, `call_count` and `last_at` in the same round trip rather
 than re-deriving the badge on the client and drifting from `_derive_status`.
 
+This leaves a window of up to one tick (30 s) in which the badge still reads `cooling down` with
+no remainder beside it, since `formatRemaining` returns `null` the moment the deadline passes.
+Accepted: closing it means deriving the badge on the client, which is exactly the drift from
+`_derive_status` this section refuses. Half a minute of a stale badge is not the failure mode
+being fixed — a badge stuck for the whole mount is.
+
 Rationale: `cooling down` with no deadline is indistinguishable from "broken". The deadline is
 what tells the user to wait instead of intervening.
 
@@ -283,7 +320,7 @@ Python (`tests/api/test_api_analytics.py`, class `TestAnalyticsEventDetail`):
   the fixture: `_fmt` rounds every row independently with Python's banker's rounding, so for
   fractional amounts the per-category strings legitimately need not add up to the formatted
   total, and the test would fail for a reason that has nothing to do with the join;
-- `share` is 1.0 for the largest category and the correct ratio for the rest;
+- `share` is each category's fraction of the event total and the values sum to 1.0;
 - daily breakdown returns correct sums and honours the limit;
 - **a spend just after local midnight is filed under its local date**, not the UTC-shifted one
   — the regression test for `substr` vs `date()` in 2.1;
@@ -301,6 +338,11 @@ Frontend (`webapp/tests/`):
   refetches), a fetch answering with those three at zero clears it — **including when
   `poisoned > 0`**, which is the 1.0 carve-out and needs its own case. This is the requirement
   from Task §1; the `store-review.test.js` case below only covers the secondary trigger.
+- **the cold-start case explicitly**: starting from empty localStorage (no dirty flag, no
+  `lastFetchedAt`), a first fetch that answers with a busy queue must leave `isStale()` true.
+  This is what fails if 1.1 is implemented with `bumpFetchTime()` instead of
+  `stampFresh()` + `markDirty()`, and no other case in this list catches it — they all start
+  from an already-dirty store.
 - extend `composable-flush-queue.test.js` and `composable-flush-receipt-queue.test.js`:
   assert `analytics.markDirty`. In the first file, `:146` is currently named "does not call
   markDirty (only receipt sends invalidate llm/review)" and asserts it for the llm and review
@@ -309,12 +351,18 @@ Frontend (`webapp/tests/`):
   **not** marked by `confirmAll`.
 - `store-income.test.js` has no analytics coverage at all today (no reference to `invalidate`
   or to the analytics store) — this is new coverage to write, not an edit.
-- cover the event detail in the component in a new/existing view test.
+- extend `store-catalog.test.js`: `patch`/`remove`/`add` with `kind === "event"` mark analytics
+  dirty, with `kind === "tag"` (or `"group"`) do not.
+- **new `component-analytics-view.test.js`** — there is no `AnalyticsView` test in
+  `webapp/tests/` today, so the event drill-down needs a file from scratch (mount + stubbed
+  store): collapsed by default, expanding fetches the detail once and caches it, `aria-expanded`
+  flips, and the empty/offline panels render their line instead of a skeleton.
 
 Frontend, Part 3 (`webapp/tests/`):
-- new `utils-time.test.js`: `formatRelative` boundaries (just now / m / h / d) and the
-  SQLite-timestamp form; `formatRemaining` returns `null` for a past deadline and the right
-  bucket for future ones.
+- new `composable-time.test.js` (the directory names composable tests `composable-*.test.js`,
+  and the module lands in `composables/`): `formatRelative` boundaries (just now / m / h / d)
+  and the SQLite-timestamp form; `formatRemaining` returns `null` for a past deadline and the
+  right bucket for future ones.
 - new `composable-use-now.test.js`: the ref advances on fake timers and the interval is cleared
   on unmount.
 - extend `component-provider-card.test.js`: `cooling` + future `cooldown_until` renders the
@@ -323,10 +371,11 @@ Frontend, Part 3 (`webapp/tests/`):
   passes an explicit `now` — the shared `BASE_PROVIDER` fixture pins `last_at` to
   `2026-05-10T11:30:00+00:00`, so an assertion resting on the real `Date.now()` would be a
   date-dependent test that rots (CLAUDE.md forbids leaving those).
-- extend/add an `LLMView` test: the header no longer contains `.pool-hint` or the text
-  `.deploy/llms.toml`, while the empty state still does; and, on fake timers, a provider whose
-  `cooldown_until` has passed triggers a refetch on the next tick even with `dirtyFlag` clear
-  (the 3.3 carve-out).
+- **new `component-llm-view.test.js`** — `webapp/tests/` has no `LLMView` test today either, so
+  this is a second file from scratch (mount + stubbed `llm` store): the header no longer
+  contains `.pool-hint` or the text `.deploy/llms.toml`, while the empty state still does; and,
+  on fake timers, a provider whose `cooldown_until` has passed triggers a refetch on the next
+  tick even with `dirtyFlag` clear (the 3.3 carve-out).
 - `ReceiptCascadeCard` must stay green after `formatRelative` moves out — check
   `webapp/tests/` for existing coverage and extend it if the relative-time line is untested.
 
@@ -334,17 +383,17 @@ No new Python tests for Part 3 — no backend change.
 
 ## Part 5. Specs
 - `specs/reference/pwa-analytics.md`: rewrite the "Client cache" section for the dirty flag
-  (expense/income/receipt, dirty-until-processed — stating that a fetch taken while receipts
-  are still being processed does not count as fresh); add the event-detail endpoint and
+  (expense/income/receipt/event edit, dirty-until-processed — stating that a fetch taken while
+  receipts are still being processed does not count as fresh); add the event-detail endpoint and
   describe the "by category" and "by recent days" breakdowns, including that the category
   breakdown covers the whole event while the day breakdown is capped at the most recent days.
-- `specs/reference/frontend-cache.md`:
-  - add an "Analytics store dirty-flag sources" section modelled on review/llm, stating the
-    `poisoned` carve-out as a rule (a terminal failure is not "still processing");
-  - **fix the `useStaleCache` section**, which currently ends "`bumpFetchTime()` … is not used
-    by any store — prefer `stampFresh()` always". Step 1.1 makes analytics its first user, so
-    that sentence is false the moment this lands; replace it with the condition under which a
-    store bumps instead of stamping.
+  **In prose only.** The file already carries a `Data source` block listing response field
+  names — a pre-existing violation of the "no field names in specs" rule. Do not extend it with
+  the new endpoint (cleaning up the existing block is a separate task, not this one).
+- `specs/reference/frontend-cache.md`: add an "Analytics store dirty-flag sources" section
+  modelled on review/llm, stating the `poisoned` carve-out as a rule (a terminal failure is not
+  "still processing"). The `useStaleCache` section needs no change — 1.1 uses
+  `stampFresh()` + `markDirty()`, so "`bumpFetchTime()` … is not used by any store" stays true.
 - `specs/ui/screens.md`, `## LLM view` — from Part 3:
   - drop `from llms.toml` from the mockup header (`:337`);
   - state in the `### ProviderCard rules` list that a cooling provider shows how long the
@@ -365,7 +414,8 @@ No new Python tests for Part 3 — no backend change.
 ## Work order and done gate
 0. Add `receipts_queue` to the summary response (1.0) — everything in Part 1 rests on it.
 1. Refactor `analytics.js` onto `useStaleCache` (queue-aware stamping) + income-store edits.
-2. Add `markDirty` at every point (flushQueue, flushReceiptQueue, review mutations + queue).
+2. Add `markDirty` at every point (flushQueue, flushReceiptQueue, review mutations + queue,
+   catalog event mutations).
 3. Backend detail endpoint + 2 SQL files + tests.
 4. Event-expansion UI + store detail + tests.
 5. LLM view: extract `composables/time.js` + `useNow`, drop the pool hint, add the cooldown and
@@ -377,6 +427,7 @@ No new Python tests for Part 3 — no backend change.
    `inv pre` after every batch.
 
 Affected files: `stores/analytics.js`, `stores/income.js`, `stores/review.js`,
+`stores/catalog.js`,
 `composables/flushQueue.js`, `composables/flushReceiptQueue.js`, `views/AnalyticsView.vue`,
 `api/analytics.js`, `src/dinary/api/analytics.py`, 2 new `.sql` files, `views/LLMView.vue`,
 `components/ProviderCard.vue`, `components/ReceiptCascadeCard.vue`, new `composables/time.js`,
