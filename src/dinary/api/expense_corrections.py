@@ -5,11 +5,11 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, Request
 
+from dinary.api.controllers.correction_ratings import record_correction_ratings
 from dinary.api.controllers.expense_corrections import (
     CategoryCorrectionRequest,
     CategoryCorrectionResponse,
     correct_category_sync,
-    record_correction_ratings,
 )
 from dinary.db.storage import get_db
 

@@ -6,7 +6,7 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 
-from dinary.api.controllers.expense_corrections import record_correction_ratings
+from dinary.api.controllers.correction_ratings import record_correction_ratings
 from dinary.api.controllers.expenses import (
     ExpenseEditRequest,
     ExpenseRequest,

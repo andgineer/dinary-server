@@ -163,3 +163,82 @@ class TestApproveRuleCategory:
 
         resp = client.patch("/api/rules/10/category", json={"category_id": 3})
         assert resp.status_code == 422
+
+
+@allure.epic("Review & Rules")
+@allure.feature("Model quality")
+class TestApproveRuleRatesModel:
+    """The endpoint must hand the rating to the broker — the decision logic is
+    unit-tested elsewhere, what matters here is that the route is wired to it.
+    """
+
+    def _seed_llm_rule(self, con, *, llm_name="groq", alternatives="[2]"):
+        _seed(con)
+        con.execute(
+            "UPDATE classification_rules SET llm_name = ?, alternative_category_ids = ?"
+            " WHERE id = 10",
+            [llm_name, alternatives],
+        )
+
+    def test_rating_reaches_the_broker(self, client, db):  # noqa: ARG002
+        calls: list[tuple] = []
+
+        class _Broker:
+            async def record_quality(self, name, operation, score):
+                calls.append((name, operation, score))
+
+        con = storage.get_connection()
+        try:
+            self._seed_llm_rule(con)
+        finally:
+            con.close()
+        client.app.state.llms = _Broker()
+
+        resp = client.patch("/api/rules/10/category", json={"category_id": 2})
+
+        assert resp.status_code == 200
+        assert calls == [("groq", "receipt_classification", 0.5)]
+
+    def test_rule_without_model_rates_nothing(self, client, db):  # noqa: ARG002
+        calls: list[tuple] = []
+
+        class _Broker:
+            async def record_quality(self, name, operation, score):
+                calls.append((name, operation, score))
+
+        con = storage.get_connection()
+        try:
+            _seed(con)
+        finally:
+            con.close()
+        client.app.state.llms = _Broker()
+
+        resp = client.patch("/api/rules/10/category", json={"category_id": 2})
+
+        assert resp.status_code == 200
+        assert calls == []
+
+    def test_broker_failure_does_not_fail_the_correction(self, client, db):  # noqa: ARG002
+        class _Broker:
+            async def record_quality(self, name, operation, score):
+                raise RuntimeError("telemetry down")
+
+        con = storage.get_connection()
+        try:
+            self._seed_llm_rule(con)
+        finally:
+            con.close()
+        client.app.state.llms = _Broker()
+
+        resp = client.patch("/api/rules/10/category", json={"category_id": 2})
+
+        assert resp.status_code == 200
+        con = storage.get_connection()
+        try:
+            rule = con.execute(
+                "SELECT category_id, source FROM classification_rules WHERE id = 10"
+            ).fetchone()
+        finally:
+            con.close()
+        assert rule[0] == 2
+        assert rule[1] == "user_correction"

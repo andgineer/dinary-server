@@ -1,26 +1,19 @@
 """Category correction business logic."""
 
-import json
 import logging
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-import llmbroker
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from dinary.background.classification.receipt_classifier import CLASSIFICATION_OPERATION
+from dinary.api.controllers.correction_ratings import pending_rating_for_item
 from dinary.db.catalog import activate_category
 from dinary.db.classification_rules import RuleSpec, create_or_update_rule
 from dinary.db.storage import transaction
 
 logger = logging.getLogger(__name__)
-
-#: A model's classification rule corrected to one of its own proposed
-#: alternatives earns partial credit; any other target is a full negative.
-_PARTIAL_CREDIT_SCORE = 0.5
-_FULL_NEGATIVE_SCORE = 0.0
 
 
 class CorrectionScope(StrEnum):
@@ -96,70 +89,6 @@ def _upsert_rule_in_tx(
     )
 
 
-def _pending_rating_for_correction(
-    con: sqlite3.Connection,
-    chain_id: int | None,
-    item_name_normalized: str,
-    corrected_to_category_id: int,
-) -> tuple[str, float] | None:
-    """Rate the model that created an llm-sourced rule now being corrected.
-
-    Returns ``(llm_name, score)`` when the existing rule is ``source='llm'`` with
-    a known model: partial credit if the corrected-to category was one of that
-    model's own proposed alternatives, else a full negative. Returns ``None`` for
-    user-sourced rules, rules with no recorded model, or a correction that just
-    re-affirms the model's own primary category (a confirmation, not a miss) —
-    those are never rated. Must be read before the upsert flips the rule to
-    ``source='user_correction'`` (which is what dedups repeated corrections).
-    """
-    row = con.execute(
-        """
-        SELECT source, llm_name, category_id, alternative_category_ids
-          FROM classification_rules
-         WHERE (chain_id IS ? OR (chain_id IS NULL AND ? IS NULL))
-           AND item_name_normalized = ?
-        """,
-        [chain_id, chain_id, item_name_normalized],
-    ).fetchone()
-    if row is None or row["source"] != "llm" or not row["llm_name"]:
-        return None
-    if corrected_to_category_id == row["category_id"]:
-        # Re-selecting the model's own primary category confirms it, so it is not
-        # a miss — rating it a full negative would penalize a correct answer.
-        return None
-    alternatives: list[int] = []
-    if row["alternative_category_ids"]:
-        try:
-            alternatives = [int(a) for a in json.loads(row["alternative_category_ids"])]
-        except (json.JSONDecodeError, ValueError, TypeError):
-            logger.warning("corrupt alternative_category_ids for rule on %r", item_name_normalized)
-    score = (
-        _PARTIAL_CREDIT_SCORE if corrected_to_category_id in alternatives else _FULL_NEGATIVE_SCORE
-    )
-    return str(row["llm_name"]), score
-
-
-async def record_correction_ratings(
-    broker: llmbroker.AsyncBroker | None,
-    pending_ratings: list[tuple[str, float]],
-) -> None:
-    """Record delayed quality ratings after the correction transaction commits.
-
-    A rating failure must never fail the correction — log and continue.
-    """
-    if broker is None:
-        return
-    for llm_name, score in pending_ratings:
-        try:
-            await broker.record_quality(llm_name, CLASSIFICATION_OPERATION, score)
-        except Exception:
-            logger.exception(
-                "record_quality failed for llm_name=%s score=%s — continuing",
-                llm_name,
-                score,
-            )
-
-
 def _validate_category_for_correction(con: sqlite3.Connection, category_id: int) -> None:
     cat_row = con.execute(
         "SELECT code, is_active, is_hidden, is_retired FROM categories WHERE id = ?",
@@ -223,7 +152,7 @@ def correct_category_sync(
             if not skip_rule:
                 # Read the model verdict before the upsert flips source to
                 # 'user_correction'; that flip is what dedups a second correction.
-                rating = _pending_rating_for_correction(
+                rating = pending_rating_for_item(
                     con,
                     chain_id,
                     name_norm,

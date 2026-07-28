@@ -3,9 +3,11 @@
 A user correction of an llm-created rule rates the model that made it: partial
 credit when the corrected-to category was one of the model's own alternatives,
 full negative otherwise. Repeated corrections of the same rule rate only once
-(the first upsert flips the rule to ``user_correction``).
+(the first write flips the rule to ``user_correction``). Both correction paths
+are covered: by expense (review list) and by rule id (review queue).
 """
 
+import asyncio
 import shutil
 import sqlite3
 import unittest.mock
@@ -13,12 +15,17 @@ import unittest.mock
 import allure
 import pytest
 
-from dinary.api.controllers.expense_corrections import (
-    CategoryCorrectionRequest,
-    _pending_rating_for_correction,
-    correct_category_sync,
+from dinary.api.controllers.correction_ratings import (
+    pending_rating_for_item,
+    pending_rating_for_rule,
     record_correction_ratings,
 )
+from dinary.api.controllers.expense_corrections import (
+    CategoryCorrectionRequest,
+    correct_category_sync,
+)
+from dinary.api.controllers.expenses import ExpenseEditRequest, edit_expense_sync
+from dinary.api.controllers.rules import approve_rule_category
 from dinary.db import db_migrations, storage
 from dinary.db.classification_rules import RuleSpec, create_or_update_rule
 
@@ -86,13 +93,13 @@ class TestPendingRatingForCorrection:
         create_or_update_rule(
             conn, None, "cola", RuleSpec(1, 3, "llm", alternative_category_ids=(2, 3), llm_name="m")
         )
-        assert _pending_rating_for_correction(conn, None, "cola", 2) == ("m", 0.5)
+        assert pending_rating_for_item(conn, None, "cola", 2) == ("m", 0.5)
 
     def test_non_alternative_gets_full_negative(self, conn):
         create_or_update_rule(
             conn, None, "cola", RuleSpec(1, 3, "llm", alternative_category_ids=(3,), llm_name="m")
         )
-        assert _pending_rating_for_correction(conn, None, "cola", 2) == ("m", 0.0)
+        assert pending_rating_for_item(conn, None, "cola", 2) == ("m", 0.0)
 
     def test_confirming_primary_category_not_rated(self, conn):
         create_or_update_rule(
@@ -100,18 +107,18 @@ class TestPendingRatingForCorrection:
         )
         # Correcting to category 1 == the rule's own primary pick is a confirmation,
         # not a miss, so the model must not be rated.
-        assert _pending_rating_for_correction(conn, None, "cola", 1) is None
+        assert pending_rating_for_item(conn, None, "cola", 1) is None
 
     def test_user_sourced_rule_not_rated(self, conn):
         create_or_update_rule(conn, None, "cola", RuleSpec(1, 3, "user_correction", llm_name="m"))
-        assert _pending_rating_for_correction(conn, None, "cola", 2) is None
+        assert pending_rating_for_item(conn, None, "cola", 2) is None
 
     def test_llm_rule_without_model_not_rated(self, conn):
         create_or_update_rule(conn, None, "cola", RuleSpec(1, 3, "llm"))
-        assert _pending_rating_for_correction(conn, None, "cola", 2) is None
+        assert pending_rating_for_item(conn, None, "cola", 2) is None
 
     def test_missing_rule_not_rated(self, conn):
-        assert _pending_rating_for_correction(conn, None, "cola", 2) is None
+        assert pending_rating_for_item(conn, None, "cola", 2) is None
 
 
 @allure.epic("Review & Rules")
@@ -176,6 +183,9 @@ class TestCorrectCategoryRatings:
         assert pending == []
 
     def test_skip_rule_mode_records_nothing(self, conn):
+        """In skip_rule mode the rule is left untouched, so the verdict is read
+        later by the caller's own rule update (see ``TestEditExpenseRatings``).
+        """
         _seed_expense_with_item(
             conn,
             name_norm="cola",
@@ -195,6 +205,103 @@ class TestCorrectCategoryRatings:
 
 @allure.epic("Review & Rules")
 @allure.feature("Model quality")
+class TestEditExpenseRatings:
+    """Editing an expense with "apply to rule" is the third path that flips an
+    llm rule to ``user_correction``, and it must rate the model like the others.
+    """
+
+    def _seed_expense_on_llm_rule(self, conn, *, alternatives=(2,)) -> None:
+        _seed_expense_with_item(
+            conn,
+            name_norm="cola",
+            category_id=1,
+            rule=RuleSpec(1, 3, "llm", alternative_category_ids=alternatives, llm_name="groq"),
+        )
+        rule_id = conn.execute("SELECT id FROM classification_rules").fetchone()[0]
+        conn.execute("UPDATE expenses SET rule_id = ? WHERE id = 1", [rule_id])
+
+    def test_rule_update_records_rating(self, conn):
+        self._seed_expense_on_llm_rule(conn)
+        pending: list[tuple[str, float]] = []
+        edit_expense_sync(
+            1,
+            ExpenseEditRequest(category_id=2, update_rule=True),
+            conn,
+            pending_ratings=pending,
+        )
+        assert pending == [("groq", 0.5)]
+
+    def test_edit_without_rule_update_records_nothing(self, conn):
+        self._seed_expense_on_llm_rule(conn)
+        pending: list[tuple[str, float]] = []
+        edit_expense_sync(
+            1,
+            ExpenseEditRequest(category_id=2, update_rule=False),
+            conn,
+            pending_ratings=pending,
+        )
+        # update_rule=False routes through the plain correction path, which
+        # upserts the rule itself and rates there.
+        assert pending == [("groq", 0.5)]
+
+
+@allure.epic("Review & Rules")
+@allure.feature("Model quality")
+class TestApproveRuleRatings:
+    """The review queue corrects by rule id, which must rate the model too —
+    it is the path a user hits most, and it also flips the rule away from its
+    llm origin, so a signal missed here is lost for good.
+    """
+
+    def _llm_rule(self, conn, *, alternatives=(3,)) -> int:
+        return create_or_update_rule(
+            conn,
+            None,
+            "cola",
+            RuleSpec(1, 3, "llm", alternative_category_ids=alternatives, llm_name="groq"),
+        )
+
+    def test_alternative_gets_partial_credit(self, conn):
+        rule_id = self._llm_rule(conn, alternatives=(2, 3))
+        assert pending_rating_for_rule(conn, rule_id, 2) == ("groq", 0.5)
+
+    def test_non_alternative_gets_full_negative(self, conn):
+        rule_id = self._llm_rule(conn)
+        assert pending_rating_for_rule(conn, rule_id, 2) == ("groq", 0.0)
+
+    def test_confirming_primary_category_not_rated(self, conn):
+        rule_id = self._llm_rule(conn)
+        assert pending_rating_for_rule(conn, rule_id, 1) is None
+
+    def test_missing_rule_not_rated(self, conn):
+        assert pending_rating_for_rule(conn, 999, 2) is None
+
+    def test_approve_records_rating(self, conn):
+        rule_id = self._llm_rule(conn, alternatives=(2,))
+        pending: list[tuple[str, float]] = []
+        approve_rule_category(rule_id, 2, conn, pending)
+        assert pending == [("groq", 0.5)]
+
+    def test_second_approve_records_nothing(self, conn):
+        rule_id = self._llm_rule(conn)
+        first: list[tuple[str, float]] = []
+        approve_rule_category(rule_id, 2, conn, first)
+        assert first == [("groq", 0.0)]
+        second: list[tuple[str, float]] = []
+        approve_rule_category(rule_id, 3, conn, second)
+        assert second == []
+
+    def test_user_sourced_rule_records_nothing(self, conn):
+        rule_id = create_or_update_rule(
+            conn, None, "cola", RuleSpec(1, 4, "user_correction", llm_name="groq")
+        )
+        pending: list[tuple[str, float]] = []
+        approve_rule_category(rule_id, 2, conn, pending)
+        assert pending == []
+
+
+@allure.epic("Review & Rules")
+@allure.feature("Model quality")
 class TestRecordCorrectionRatings:
     def test_records_each_rating(self):
         calls: list[tuple] = []
@@ -203,8 +310,6 @@ class TestRecordCorrectionRatings:
             async def record_quality(self, name, operation, score):
                 calls.append((name, operation, score))
 
-        import asyncio
-
         asyncio.run(record_correction_ratings(_Broker(), [("groq", 0.0), ("openrouter", 0.5)]))
         assert calls == [
             ("groq", "receipt_classification", 0.0),
@@ -212,13 +317,9 @@ class TestRecordCorrectionRatings:
         ]
 
     def test_none_broker_is_noop(self):
-        import asyncio
-
         asyncio.run(record_correction_ratings(None, [("groq", 0.0)]))
 
     def test_rating_failure_swallowed(self):
-        import asyncio
-
         class _Broker:
             async def record_quality(self, name, operation, score):
                 raise RuntimeError("telemetry down")

@@ -11,6 +11,7 @@ import sqlite3
 import allure
 import llmbroker
 import pytest
+from llmbroker.backends import spec as llmbroker_spec
 
 from dinary.config import settings
 from dinary.db import db_migrations, storage
@@ -363,8 +364,9 @@ class TestAccountingCurrencyAnchor:
 
 @allure.epic("Infrastructure")
 @allure.feature("Migrations")
-class TestLegacyLlmbrokerCleanup:
-    """0002 drops the legacy llmbroker tables AND resets PRAGMA user_version.
+class TestLlmbrokerUpgrade:
+    """0002 drops the legacy llmbroker tables, resets PRAGMA user_version, and
+    adds ``classification_rules.llm_name``.
 
     llmbroker 0.0.11 stamped the file-global ``user_version`` to 1; llmbroker
     1.3.0 accepts only 0 or its own schema version and otherwise raises. ``DROP
@@ -372,13 +374,24 @@ class TestLegacyLlmbrokerCleanup:
     0.0.11 -> 1.3.0 upgrade crashes on the first broker call.
     """
 
+    # Every table a pre-1.3.0 dinary could leave behind: the llmbroker 0.0.11 set
+    # plus the two dinary owned before the package took over provider management.
+    _LEGACY_TABLES = (
+        "llmbroker_registry",
+        "llmbroker_calls",
+        "llmbroker_secrets",
+        "llmbroker_state",
+        "llmbroker_providers",
+        "llmbroker_call_log",
+    )
+
     def _seed_0_0_11_database(self, tmp_path, monkeypatch):
         monkeypatch.setattr(storage, "DATA_DIR", tmp_path)
         monkeypatch.setattr(storage, "DB_PATH", tmp_path / "dinary.db")
         con = sqlite3.connect(str(storage.DB_PATH), isolation_level=None)
         try:
-            con.execute("CREATE TABLE llmbroker_registry (name TEXT)")
-            con.execute("CREATE TABLE llmbroker_state (name TEXT)")
+            for table in self._LEGACY_TABLES:
+                con.execute(f"CREATE TABLE {table} (name TEXT)")
             con.execute("PRAGMA user_version = 1")
         finally:
             con.close()
@@ -396,8 +409,51 @@ class TestLegacyLlmbrokerCleanup:
         finally:
             con.close()
         assert user_version == 0
-        assert "llmbroker_registry" not in tables
-        assert "llmbroker_state" not in tables
+        assert tables.isdisjoint(self._LEGACY_TABLES)
+
+    def test_adds_llm_name_to_classification_rules(self, fresh_db):
+        con = _connect(fresh_db)
+        try:
+            assert "llm_name" in _column_names(con, "classification_rules")
+        finally:
+            con.close()
+
+    def test_upgraded_database_gets_llm_name(self, tmp_path, monkeypatch):
+        """The column must also land on a 0.0.11-era database, not only a fresh one."""
+        db = self._seed_0_0_11_database(tmp_path, monkeypatch)
+
+        db_migrations.migrate_db(db)
+
+        con = _connect(db)
+        try:
+            assert "llm_name" in _column_names(con, "classification_rules")
+        finally:
+            con.close()
+
+    def test_fresh_broker_owns_every_remaining_llmbroker_table(self, tmp_path, monkeypatch):
+        """No llmbroker_-prefixed table may outlive the cleanup unless the running
+        llmbroker recreated it — a stale one holds dead rows (and plaintext keys)
+        that nothing migrates or reads again."""
+        db = self._seed_0_0_11_database(tmp_path, monkeypatch)
+        db_migrations.migrate_db(db)
+
+        preset = tmp_path / "llms.toml"
+        preset.write_text("# no providers\n")
+
+        async def _run() -> None:
+            broker = llmbroker.AsyncBroker(f"sqlite://{db}", optimize=llmbroker.Optimizer())
+            await broker.sync(preset)
+            await broker.aclose()
+
+        asyncio.run(_run())
+
+        con = _connect(db)
+        try:
+            tables = _table_names(con)
+        finally:
+            con.close()
+        current = {spec.name for spec in llmbroker_spec.TABLES.values()}
+        assert {t for t in tables if t.startswith("llmbroker_")} <= current
 
     def test_broker_starts_on_upgraded_db(self, tmp_path, monkeypatch):
         """After the migration a real llmbroker broker provisions its schema on

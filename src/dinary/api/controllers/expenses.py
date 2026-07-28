@@ -18,6 +18,7 @@ from dinary.api.controllers.catalog import (
     most_used_category_per_group,
     most_used_group,
 )
+from dinary.api.controllers.correction_ratings import pending_rating_for_rule
 from dinary.api.controllers.expense_corrections import (
     CategoryCorrectionRequest,
     CorrectionScope,
@@ -340,7 +341,7 @@ def edit_expense_sync(
             )
 
         if req.update_rule:
-            _apply_rule_update(con, expense_id, req.category_id, req.tag_ids)
+            _apply_rule_update(con, expense_id, req.category_id, req.tag_ids, pending_ratings)
 
 
 def _apply_rule_update(
@@ -348,6 +349,7 @@ def _apply_rule_update(
     expense_id: int,
     category_id: int | None,
     tag_ids: list[int],
+    pending_ratings: list[tuple[str, float]] | None = None,
 ) -> None:
     row = con.execute(
         "SELECT rule_id, category_id FROM expenses WHERE id = ?",
@@ -361,6 +363,12 @@ def _apply_rule_update(
         return
     effective_category_id = category_id if category_id is not None else int(row[1])
     rule_id = int(row[0])
+    # This write is what flips the rule away from its llm origin, so the model
+    # verdict has to be read here — ``correct_category_sync`` ran in skip_rule
+    # mode and left the rule untouched.
+    rating = pending_rating_for_rule(con, rule_id, effective_category_id)
+    if rating is not None and pending_ratings is not None:
+        pending_ratings.append(rating)
     con.execute(
         "UPDATE classification_rules"
         " SET category_id=?, confidence_level=4, source='user_correction', tag_ids=?"

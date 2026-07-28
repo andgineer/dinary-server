@@ -1,10 +1,12 @@
 """Rules API: /api/rules/*"""
 
+import asyncio
 import sqlite3
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel
 
+from dinary.api.controllers.correction_ratings import record_correction_ratings
 from dinary.api.controllers.rules import (
     approve_rule_category,
     build_rules_feed,
@@ -43,9 +45,22 @@ class ApproveCategoryRequest(BaseModel):
 
 
 @router.patch("/api/rules/{rule_id}/category")
-def approve_rule_category_route(
+async def approve_rule_category_route(
     rule_id: int,
     body: ApproveCategoryRequest,
+    request: Request,
     con: sqlite3.Connection = Depends(get_db),  # noqa: B008
 ) -> dict:
-    return approve_rule_category(rule_id, body.category_id, con)
+    pending_ratings: list[tuple[str, float]] = []
+    # Offload the blocking sqlite work to a thread so this async handler does not
+    # run it on the event loop; every other DB endpoint is sync `def` and gets
+    # the same threadpool offload from Starlette automatically.
+    result = await asyncio.to_thread(
+        approve_rule_category,
+        rule_id,
+        body.category_id,
+        con,
+        pending_ratings,
+    )
+    await record_correction_ratings(request.app.state.llms, pending_ratings)
+    return result

@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from dinary.api.controllers.correction_ratings import pending_rating_for_rule
 from dinary.db.catalog import VISIBLE_CATEGORY_PREDICATE
 from dinary.db.receipts import classification_job_counts
 from dinary.db.storage import transaction
@@ -141,7 +142,12 @@ def confirm_rules_bulk(con: sqlite3.Connection, rule_ids: list[int]) -> int:
     return len(rule_ids)
 
 
-def approve_rule_category(rule_id: int, category_id: int, con: sqlite3.Connection) -> dict:
+def approve_rule_category(
+    rule_id: int,
+    category_id: int,
+    con: sqlite3.Connection,
+    pending_ratings: list[tuple[str, float]] | None = None,
+) -> dict:
     if (
         con.execute(
             "SELECT id FROM classification_rules WHERE id = ?",
@@ -162,6 +168,11 @@ def approve_rule_category(rule_id: int, category_id: int, con: sqlite3.Connectio
             detail=f"Unknown or inactive category_id: {category_id}",
         )
     with transaction(con):
+        # Read the model verdict before the update flips source to
+        # 'user_correction'; that flip is what dedups a second correction.
+        rating = pending_rating_for_rule(con, rule_id, category_id)
+        if rating is not None and pending_ratings is not None:
+            pending_ratings.append(rating)
         con.execute(
             "UPDATE classification_rules"
             " SET category_id=?, confidence_level=4, source='user_correction'"
