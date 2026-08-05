@@ -1,7 +1,9 @@
 """Healthcheck task and helpers — moved from server.py."""
 
 import sys
+from datetime import UTC
 from datetime import date as _date
+from datetime import datetime as _datetime
 from datetime import timedelta as _timedelta
 
 from invoke import task
@@ -15,6 +17,10 @@ from tasks.ssh_utils import (
     ssh_capture_bytes,
     ssh_replica_capture_bytes,
 )
+
+# A journal fallback alerts for this long, then stops — the metadata row stays
+# as an audit record, but a one-off degradation must not fail every later run.
+FALLBACK_ALERT_WINDOW = _timedelta(hours=24)
 
 
 def _healthcheck_run_queries(c, remote: bool, **queries: str) -> dict[str, str]:  # noqa: ARG001
@@ -227,17 +233,31 @@ def _healthcheck_receipt_queue(results: dict[str, str]) -> bool:
     return False
 
 
+def _fallback_is_recent(fallback: str, now: _datetime) -> bool:
+    stamp = fallback.split("|", 1)[0].strip()
+    try:
+        when = _datetime.fromisoformat(stamp)
+    except ValueError:
+        return True  # unreadable timestamp is itself worth an alert
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return now - when <= FALLBACK_ALERT_WINDOW
+
+
 def _healthcheck_receipt_fetch(results: dict[str, str]) -> bool:
     """Print receipt-fetch health lines. Returns True if any failure was found."""
     fallback = results.get("receipt_fallback", "").strip()
     count = results.get("receipt_fallback_count", "0").strip()
 
     if count != "0":
-        print(f"OK: /specifications fallback uses since last start: {count}")
+        print(f"OK: /specifications fallback uses, all time: {count}")
 
-    if fallback:
+    if not fallback:
+        return False
+    if _fallback_is_recent(fallback, _datetime.now(UTC)):
         print(f"FAIL: /specifications fallback used — {fallback}", file=sys.stderr)
         return True
+    print(f"OK: last /specifications fallback older than alert window — {fallback}")
     return False
 
 

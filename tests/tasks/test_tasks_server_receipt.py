@@ -1,5 +1,7 @@
 """Tests for receipt-pipeline healthcheck functions in tasks/healthcheck.py."""
 
+from datetime import UTC, datetime, timedelta
+
 import allure
 
 from tasks.healthcheck import (
@@ -7,6 +9,10 @@ from tasks.healthcheck import (
     _healthcheck_receipt_llm,
     _healthcheck_receipt_queue,
 )
+
+
+def _ago(**delta) -> str:
+    return (datetime.now(UTC) - timedelta(**delta)).isoformat()
 
 
 @allure.epic("Receipts")
@@ -102,7 +108,37 @@ class TestHealthcheckReceiptFetch:
 
     def test_fails_on_fallback(self):
         results = {
-            "receipt_fallback": "2026-05-08T09:55:00Z | invoice: XYZ | reason: HTTP 503",
+            "receipt_fallback": f"{_ago(hours=1)} | invoice: XYZ | reason: HTTP 503",
+            "receipt_fallback_count": "1",
+        }
+        assert _healthcheck_receipt_fetch(results) is True
+
+    def test_ok_when_fallback_older_than_alert_window(self):
+        results = {
+            "receipt_fallback": f"{_ago(hours=49)} | invoice: XYZ | reason: HTTP 503",
+            "receipt_fallback_count": "1",
+        }
+        assert _healthcheck_receipt_fetch(results) is False
+
+    def test_still_reports_stale_fallback_as_info(self, capsys):
+        results = {
+            "receipt_fallback": f"{_ago(hours=49)} | invoice: XYZ | reason: HTTP 503",
+            "receipt_fallback_count": "1",
+        }
+        _healthcheck_receipt_fetch(results)
+        assert "XYZ" in capsys.readouterr().out
+
+    def test_fails_on_unparseable_timestamp(self):
+        results = {
+            "receipt_fallback": "not-a-date | invoice: XYZ | reason: HTTP 503",
+            "receipt_fallback_count": "1",
+        }
+        assert _healthcheck_receipt_fetch(results) is True
+
+    def test_naive_timestamp_treated_as_utc(self):
+        stamp = (datetime.now(UTC) - timedelta(hours=1)).replace(tzinfo=None).isoformat()
+        results = {
+            "receipt_fallback": f"{stamp} | invoice: XYZ | reason: HTTP 503",
             "receipt_fallback_count": "1",
         }
         assert _healthcheck_receipt_fetch(results) is True
