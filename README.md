@@ -44,7 +44,7 @@
 | src/dinary/background/classification/store\_resolver.py        |       31 |        1 |     97% |        69 |
 | src/dinary/background/classification/task.py                   |      267 |       21 |     92% |80, 133-134, 140-147, 215-229, 332, 381, 496-497, 542 |
 | src/dinary/background/rate\_prefetch/task.py                   |       51 |        2 |     96% |    59, 87 |
-| src/dinary/background/sheet\_logging/income\_sheet\_logging.py |      176 |       44 |     75% |58-63, 89-90, 97-98, 106-108, 119, 152, 165-168, 176-179, 204-205, 217, 234, 240-242, 270-277, 289, 293, 317-325 |
+| src/dinary/background/sheet\_logging/income\_sheet\_logging.py |      177 |       44 |     75% |59-64, 90-91, 98-99, 107-109, 120, 153, 166-169, 177-180, 205-206, 218, 235, 241-243, 271-278, 290, 294, 318-326 |
 | src/dinary/background/sheet\_logging/logging\_jobs.py          |       63 |        9 |     86% |78-79, 95-101 |
 | src/dinary/background/sheet\_logging/sheet\_logging.py         |      221 |       39 |     82% |91-95, 109-116, 124, 181-182, 192, 197-199, 242-244, 267-268, 272-282, 352, 391-392, 403, 407, 434-435, 455-465 |
 | src/dinary/background/sheet\_logging/sheets\_write.py          |       65 |       35 |     46% |106-111, 116-119, 123-128, 143-177 |
@@ -75,7 +75,7 @@
 | src/dinary\_analytics/refresh.py                               |      100 |        2 |     98% |   50, 157 |
 | src/dinary\_analytics/settings.py                              |       49 |        1 |     98% |        56 |
 | src/dinary\_analytics/views.py                                 |       23 |        1 |     96% |        62 |
-| **TOTAL**                                                      | **5193** |  **647** | **88%** |           |
+| **TOTAL**                                                      | **5194** |  **647** | **88%** |           |
 
 
 ## Setup coverage badge

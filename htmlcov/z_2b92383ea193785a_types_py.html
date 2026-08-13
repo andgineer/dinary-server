@@ -64,8 +64,8 @@
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_2795f89fe87e2487_sheets_client_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
-            created at 2026-08-05 06:33 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
+            created at 2026-08-13 11:03 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -80,13 +80,13 @@
     </div>
 </header>
 <main id="source">
-    <p class="pln"><span class="n"><a id="t1" href="#t1">1</a></span><span class="t"><span class="str">"""Shared types for fiscal-receipt parsing (country-agnostic).</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t1" href="#t1">1</a></span><span class="t"><span class="str">&quot;&quot;&quot;Shared types for fiscal-receipt parsing (country-agnostic).</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t2" href="#t2">2</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t3" href="#t3">3</a></span><span class="t"><span class="str">The Serbian and Montenegrin parsers both produce these structures and raise</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t4" href="#t4">4</a></span><span class="t"><span class="str">this error taxonomy; the dispatch layer and the DB layer consume them. Kept in</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t5" href="#t5">5</a></span><span class="t"><span class="str">a dependency-free leaf module so the parsers and the dispatcher can import it</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t6" href="#t6">6</a></span><span class="t"><span class="str">without an import cycle.</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t"><span class="str">"""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t"><span class="str">&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t8" href="#t8">8</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t"><span class="key">from</span> <span class="nam">dataclasses</span> <span class="key">import</span> <span class="nam">dataclass</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t10" href="#t10">10</a></span><span class="t"><span class="key">from</span> <span class="nam">datetime</span> <span class="key">import</span> <span class="nam">datetime</span>&nbsp;</span><span class="r"></span></p>
@@ -94,16 +94,16 @@
     <p class="pln"><span class="n"><a id="t12" href="#t12">12</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t13" href="#t13">13</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t14" href="#t14">14</a></span><span class="t"><span class="key">class</span> <span class="nam">ParserRequestError</span><span class="op">(</span><span class="nam">Exception</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t">    <span class="str">"""Raised when a receipt fetch fails due to a network or HTTP error (transient)."""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t15" href="#t15">15</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Raised when a receipt fetch fails due to a network or HTTP error (transient).&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t16" href="#t16">16</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t17" href="#t17">17</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t18" href="#t18">18</a></span><span class="t"><span class="key">class</span> <span class="nam">ParserParseError</span><span class="op">(</span><span class="nam">Exception</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t">    <span class="str">"""Raised when a receipt cannot be parsed due to unexpected content (permanent)."""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t19" href="#t19">19</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Raised when a receipt cannot be parsed due to unexpected content (permanent).&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t"><span class="key">class</span> <span class="nam">ParserNotIndexedError</span><span class="op">(</span><span class="nam">Exception</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t">    <span class="str">"""Raised when the fiscal service returns no receipt data &#8212; the receipt is</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="str">    likely not indexed yet (transient; resolves once the service processes it)."""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Raised when the fiscal service returns no receipt data &#8212; the receipt is</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="str">    likely not indexed yet (transient; resolves once the service processes it).&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t27" href="#t27">27</a></span><span class="t"><span class="op">@</span><span class="nam">dataclass</span><span class="op">(</span><span class="nam">slots</span><span class="op">=</span><span class="key">True</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -140,8 +140,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_2795f89fe87e2487_sheets_client_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
-            created at 2026-08-05 06:33 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
+            created at 2026-08-13 11:03 +0000
         </p>
     </div>
 </footer>

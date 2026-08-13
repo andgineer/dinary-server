@@ -64,8 +64,8 @@
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_c7809b5ac8a05298_llm_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
-            created at 2026-08-05 06:33 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
+            created at 2026-08-13 11:03 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -80,7 +80,7 @@
     </div>
 </header>
 <main id="source">
-    <p class="pln"><span class="n"><a id="t1" href="#t1">1</a></span><span class="t"><span class="str">"""DuckDB connection over the ledger SQLite replica."""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t1" href="#t1">1</a></span><span class="t"><span class="str">&quot;&quot;&quot;DuckDB connection over the ledger SQLite replica.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t2" href="#t2">2</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t3" href="#t3">3</a></span><span class="t"><span class="key">from</span> <span class="nam">pathlib</span> <span class="key">import</span> <span class="nam">Path</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t4" href="#t4">4</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -88,7 +88,7 @@
     <p class="pln"><span class="n"><a id="t6" href="#t6">6</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t7" href="#t7">7</a></span><span class="t"><span class="key">from</span> <span class="nam">dinary_analytics</span><span class="op">.</span><span class="nam">paths</span> <span class="key">import</span> <span class="nam">QUERIES_DIR</span><span class="op">,</span> <span class="nam">REPLICA_PATH</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t8" href="#t8">8</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t"><span class="nam">LEDGER_SCHEMA</span> <span class="op">=</span> <span class="str">"""\</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t9" href="#t9">9</a></span><span class="t"><span class="nam">LEDGER_SCHEMA</span> <span class="op">=</span> <span class="str">&quot;&quot;&quot;\</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t10" href="#t10">10</a></span><span class="t"><span class="str">-- expenses: one row per expense; amount is in accounting currency (EUR)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t11" href="#t11">11</a></span><span class="t"><span class="str">CREATE TABLE expenses (</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t12" href="#t12">12</a></span><span class="t"><span class="str">    id                INTEGER PRIMARY KEY AUTOINCREMENT,</span>&nbsp;</span><span class="r"></span></p>
@@ -160,20 +160,20 @@
     <p class="run run2"><span class="n"><a id="t78" href="#t78">78</a></span><span class="t"><span class="str">    rate     DECIMAL(18,6) NOT NULL,</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t79" href="#t79">79</a></span><span class="t"><span class="str">    PRIMARY KEY (currency, date)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run run2"><span class="n"><a id="t80" href="#t80">80</a></span><span class="t"><span class="str">);</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run run2"><span class="n"><a id="t81" href="#t81">81</a></span><span class="t"><span class="str">"""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t81" href="#t81">81</a></span><span class="t"><span class="str">&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t82" href="#t82">82</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t83" href="#t83">83</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t"><span class="key">def</span> <span class="nam">open_ledger</span><span class="op">(</span><span class="nam">replica_path</span><span class="op">:</span> <span class="nam">Path</span> <span class="op">|</span> <span class="key">None</span> <span class="op">=</span> <span class="key">None</span><span class="op">)</span> <span class="op">-></span> <span class="nam">duckdb</span><span class="op">.</span><span class="nam">DuckDBPyConnection</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">    <span class="str">"""Return a DuckDB in-memory connection with the ledger SQLite replica attached as 'ledger'."""</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t"><span class="key">def</span> <span class="nam">open_ledger</span><span class="op">(</span><span class="nam">replica_path</span><span class="op">:</span> <span class="nam">Path</span> <span class="op">|</span> <span class="key">None</span> <span class="op">=</span> <span class="key">None</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">duckdb</span><span class="op">.</span><span class="nam">DuckDBPyConnection</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Return a DuckDB in-memory connection with the ledger SQLite replica attached as &#x27;ledger&#x27;.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">    <span class="nam">path</span> <span class="op">=</span> <span class="nam">replica_path</span> <span class="key">or</span> <span class="nam">REPLICA_PATH</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">    <span class="nam">con</span> <span class="op">=</span> <span class="nam">duckdb</span><span class="op">.</span><span class="nam">connect</span><span class="op">(</span><span class="str">":memory:"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">    <span class="nam">con</span><span class="op">.</span><span class="nam">execute</span><span class="op">(</span><span class="fst">f"</span><span class="fst">ATTACH '</span><span class="op">{</span><span class="nam">path</span><span class="op">}</span><span class="fst">' AS ledger (TYPE sqlite, READ_ONLY)</span><span class="fst">"</span><span class="op">)</span>  <span class="com"># noqa: S608</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">    <span class="nam">con</span> <span class="op">=</span> <span class="nam">duckdb</span><span class="op">.</span><span class="nam">connect</span><span class="op">(</span><span class="str">&quot;:memory:&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">    <span class="nam">con</span><span class="op">.</span><span class="nam">execute</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">ATTACH &#x27;</span><span class="op">{</span><span class="nam">path</span><span class="op">}</span><span class="fst">&#x27; AS ledger (TYPE sqlite, READ_ONLY)</span><span class="fst">&quot;</span><span class="op">)</span>  <span class="com"># noqa: S608</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">    <span class="key">return</span> <span class="nam">con</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t91" href="#t91">91</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t"><span class="key">def</span> <span class="nam">load_query</span><span class="op">(</span><span class="nam">name</span><span class="op">:</span> <span class="nam">str</span><span class="op">)</span> <span class="op">-></span> <span class="nam">str</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">    <span class="str">"""Return the SQL text of a named query file from the queries directory."""</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">    <span class="key">return</span> <span class="op">(</span><span class="nam">QUERIES_DIR</span> <span class="op">/</span> <span class="fst">f"</span><span class="op">{</span><span class="nam">name</span><span class="op">}</span><span class="fst">.sql</span><span class="fst">"</span><span class="op">)</span><span class="op">.</span><span class="nam">read_text</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t92" href="#t92">92</a></span><span class="t"><span class="key">def</span> <span class="nam">load_query</span><span class="op">(</span><span class="nam">name</span><span class="op">:</span> <span class="nam">str</span><span class="op">)</span> <span class="op">-&gt;</span> <span class="nam">str</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t93" href="#t93">93</a></span><span class="t">    <span class="str">&quot;&quot;&quot;Return the SQL text of a named query file from the queries directory.&quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t94" href="#t94">94</a></span><span class="t">    <span class="key">return</span> <span class="op">(</span><span class="nam">QUERIES_DIR</span> <span class="op">/</span> <span class="fst">f&quot;</span><span class="op">{</span><span class="nam">name</span><span class="op">}</span><span class="fst">.sql</span><span class="fst">&quot;</span><span class="op">)</span><span class="op">.</span><span class="nam">read_text</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -182,8 +182,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_c7809b5ac8a05298_llm_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.2">coverage.py v7.15.2</a>,
-            created at 2026-08-05 06:33 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
+            created at 2026-08-13 11:03 +0000
         </p>
     </div>
 </footer>
