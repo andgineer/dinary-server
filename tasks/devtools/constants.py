@@ -86,9 +86,10 @@ LITESTREAM_SERVICE = (
     "[Unit]\nDescription=Litestream replicator for dinary\n"
     "After=network-online.target tailscaled.service\n"
     "Wants=network-online.target tailscaled.service\n\n"
+    # No tailscale readiness gate, unlike the app unit above: litestream retries the
+    # replica connection on its own, so a not-yet-ready network costs a retry, not a
+    # broken start. The ordering below stays for the case of a MagicDNS replica host.
     "[Service]\nType=simple\nUser=ubuntu\n"
-    "ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do "
-    "tailscale ip -4 >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1'\n"
     "ExecStart=/usr/bin/litestream replicate -config /etc/litestream.yml\n"
     "Restart=always\nRestartSec=5\n"
     "NoNewPrivileges=true\n"

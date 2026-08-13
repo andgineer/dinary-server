@@ -501,6 +501,13 @@ class TestDinaryServiceBindHost:
         assert "ExecStartPre=" in unit
         assert "tailscale ip -4" in unit
 
+    def test_litestream_unit_has_no_tailscale_readiness_gate(self):
+        """The app unit needs one, the replicator does not — it retries the replica
+        connection itself. Copying the guard over costs up to 30s of boot delay and
+        implies a tailscale dependency the SFTP path does not have."""
+        assert "ExecStartPre=" not in tasks.devtools.constants.LITESTREAM_SERVICE
+        assert "tailscale ip -4" not in tasks.devtools.constants.LITESTREAM_SERVICE
+
     def test_none_service_unit_binds_to_all_interfaces(self):
         unit = tasks.devtools.constants.DINARY_SERVICE.format(
             host=tasks.devtools.env.bind_host("none")
