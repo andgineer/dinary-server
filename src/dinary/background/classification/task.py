@@ -142,7 +142,7 @@ def _schedule_wakeup(delay_sec: float) -> None:
     if ev is None or loop is None or loop.is_closed():
         return
     try:
-        loop.call_soon_threadsafe(loop.call_later, delay_sec, ev.set)
+        loop.call_soon_threadsafe(lambda: loop.call_later(delay_sec, ev.set))
     except RuntimeError:
         return
 

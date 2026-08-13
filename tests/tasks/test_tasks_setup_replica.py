@@ -113,6 +113,61 @@ class TestLitestreamSetupPermissions:
         assert perm_call is not None
         assert tasks.devtools.constants.REMOTE_LITESTREAM_CONFIG_PATH in perm_call
 
+    def test_restarts_litestream_after_the_service_is_created(self, _spy):
+        """``enable --now`` does nothing to a running unit, so without an explicit
+        restart a re-apply keeps the previous binary and config live."""
+        tasks.setup_replica.body(MagicMock(), no_swap=True)
+        kinds = [(kind, cmd) for kind, cmd in _spy if kind in {"service", "sudo"}]
+        assert ("sudo", "systemctl restart litestream") in kinds
+        service_idx = kinds.index(("service", "litestream"))
+        restart_idx = kinds.index(("sudo", "systemctl restart litestream"))
+        assert restart_idx > service_idx, "restart must follow the unit + config write"
+
+
+@allure.epic("Infrastructure")
+@allure.feature("Deploy")
+@allure.story("Replica setup")
+class TestLitestreamConfig:
+    """Pins the generated ``/etc/litestream.yml`` — a wrong key name here is accepted
+    silently by Litestream and only shows up as a replication surprise weeks later."""
+
+    @pytest.fixture(autouse=True)
+    def _env(self, monkeypatch):
+        monkeypatch.setattr(
+            tasks.backups.backups_replica, "replica_host", lambda: "ubuntu@dinary-replica"
+        )
+        monkeypatch.setattr(tasks.backups.backups_replica, "litestream_retention", lambda: "168h")
+
+    def test_disables_concurrent_writes(self):
+        """Concurrent writes are on by default and make a failed upload restart from
+        byte zero instead of resuming."""
+        config = tasks.backups.backups_replica._build_litestream_config()
+        assert "      concurrent-writes: false\n" in config
+
+    def test_splits_replica_host_into_user_and_host_port(self):
+        """The ``user@`` prefix must not leak into ``host:`` — Litestream would then
+        resolve a hostname that does not exist."""
+        config = tasks.backups.backups_replica._build_litestream_config()
+        assert "      host: dinary-replica:22\n" in config
+        assert "      user: ubuntu\n" in config
+
+    def test_defaults_user_to_ubuntu_when_host_has_no_user_prefix(self, monkeypatch):
+        """A bare host in ``.deploy/.env`` must still produce a usable SFTP login."""
+        monkeypatch.setattr(tasks.backups.backups_replica, "replica_host", lambda: "dinary-replica")
+        config = tasks.backups.backups_replica._build_litestream_config()
+        assert "      host: dinary-replica:22\n" in config
+        assert "      user: ubuntu\n" in config
+
+    def test_replica_path_and_retention_come_from_constants_and_env(self):
+        """Drift between the config path and ``REPLICA_LITESTREAM_DIR`` would restore
+        from a tree nothing replicates into."""
+        config = tasks.backups.backups_replica._build_litestream_config()
+        replica_dir = tasks.devtools.constants.REPLICA_LITESTREAM_DIR
+        replica_db = tasks.devtools.constants.REPLICA_DB_NAME
+        assert f"      path: {replica_dir}/{replica_db}\n" in config
+        assert "  retention: 168h\n" in config
+        assert f"  interval: {tasks.devtools.constants.LITESTREAM_SNAPSHOT_INTERVAL}\n" in config
+
 
 @allure.epic("Infrastructure")
 @allure.feature("Deploy")

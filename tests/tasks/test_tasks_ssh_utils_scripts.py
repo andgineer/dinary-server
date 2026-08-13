@@ -69,10 +69,26 @@ class TestLitestreamInstallScript:
             f"v{tasks.devtools.constants.LITESTREAM_VERSION}/$ASSET" in script
         )
 
-    def test_script_is_idempotent_when_litestream_already_installed(self):
-        """Re-running must be cheap: no download when already on PATH."""
+    def test_script_is_idempotent_when_pinned_version_already_installed(self):
+        """Re-running must be cheap: no download when the installed version matches."""
         script = tasks.ssh_utils.litestream_install_script()
-        assert "if ! command -v litestream >/dev/null" in script
+        assert (
+            f'if [ "$(litestream version 2>/dev/null)" != '
+            f'"{tasks.devtools.constants.LITESTREAM_VERSION}" ]; then' in script
+        )
+
+    def test_version_mismatch_triggers_reinstall_not_a_path_check(self):
+        """A ``command -v`` guard would freeze every provisioned VM on its bootstrap
+        version, so a constant bump would never reach an existing deployment."""
+        script = tasks.ssh_utils.litestream_install_script()
+        assert "command -v litestream" not in script
+
+    def test_dpkg_keeps_the_generated_config_without_prompting(self):
+        """The .deb ships ``/etc/litestream.yml`` as a conffile: without
+        ``--force-confold`` dpkg blocks on an interactive prompt over SSH and would
+        otherwise replace the config ``inv setup-replica`` generated."""
+        script = tasks.ssh_utils.litestream_install_script()
+        assert "sudo dpkg -i --force-confold /tmp/$ASSET" in script
 
     def test_version_parameter_allows_future_upgrade(self):
         """A version bump should be a one-line constant change, not string surgery."""

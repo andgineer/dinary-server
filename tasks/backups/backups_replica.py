@@ -57,7 +57,11 @@ def _replica_sftp_host() -> str:
 
 
 def _build_litestream_config() -> str:
-    """All values derived from ``.deploy/.env`` + constants — no manual template."""
+    """All values derived from ``.deploy/.env`` + constants — no manual template.
+
+    ``concurrent-writes: false`` trades throughput we do not need on a ~1.5 MB database for
+    uploads that resume after a failed chunk instead of being re-sent from scratch.
+    """
     rhost = replica_host()
     if "@" in rhost:
         user, host_part = rhost.split("@", 1)
@@ -79,6 +83,7 @@ def _build_litestream_config() -> str:
         f"      user: {user}\n"
         f"      key-path: {VM1_LITESTREAM_KEY_PATH}\n"
         f"      path: {REPLICA_LITESTREAM_DIR}/{REPLICA_DB_NAME}\n"
+        "      concurrent-writes: false\n"
     )
 
 
@@ -267,6 +272,9 @@ def setup_replica(c, swap_size_gb=1, no_swap=False):
         f"&& chmod 644 {REMOTE_LITESTREAM_CONFIG_PATH}'",
     )
     create_service(c, "litestream", LITESTREAM_SERVICE)
+    # `enable --now` is a no-op on an already-running unit, so a re-apply would keep the
+    # old binary and the old config live until the next reboot.
+    ssh_sudo(c, "systemctl restart litestream")
     ssh_run(
         c,
         "sleep 3 && systemctl is-active litestream && "

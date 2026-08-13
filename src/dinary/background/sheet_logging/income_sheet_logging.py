@@ -15,6 +15,7 @@ import logging
 import sqlite3
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import gspread
 from gspread.utils import ValueInputOption
@@ -209,7 +210,7 @@ def _write_row_to_worksheet(
         existing_rate = (
             row_data[_INC_COL_RATE - 1].strip() if len(row_data) >= _INC_COL_RATE else ""
         )
-        updates = [
+        updates: list[dict[str, Any]] = [
             {"range": f"B{r}", "values": [[app_amount]]},
             {"range": f"F{r}", "values": [[marker]]},
         ]

@@ -183,10 +183,16 @@ def setup_cloudflare(c):
 
 
 def litestream_install_script(version=None):
-    """Idempotent: short-circuits when ``litestream`` is already on PATH."""
+    """Installs or upgrades to the pinned version; short-circuits when it already matches.
+
+    A ``command -v`` guard instead would pin every already-provisioned VM to whatever
+    version it was bootstrapped with, so a constant bump would never reach production.
+    ``--force-confold`` keeps the generated ``/etc/litestream.yml``: the .deb ships its own
+    copy as a conffile, and dpkg would otherwise stop on an interactive prompt.
+    """
     ver = version if version is not None else LITESTREAM_VERSION
     return (
-        f"if ! command -v litestream >/dev/null; then\n"
+        f'if [ "$(litestream version 2>/dev/null)" != "{ver}" ]; then\n'
         f"  ARCH=$(uname -m)\n"
         f"  case $ARCH in\n"
         f"    x86_64|amd64) ASSET=litestream-{ver}-linux-x86_64.deb ;;\n"
@@ -195,7 +201,7 @@ def litestream_install_script(version=None):
         f"  esac\n"
         f"  URL=https://github.com/benbjohnson/litestream/releases/download/v{ver}/$ASSET\n"
         f"  curl -fsSL -o /tmp/$ASSET $URL\n"
-        f"  sudo dpkg -i /tmp/$ASSET\n"
+        f"  sudo dpkg -i --force-confold /tmp/$ASSET\n"
         f"  rm /tmp/$ASSET\n"
         f"fi\n"
     )

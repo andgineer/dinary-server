@@ -387,7 +387,7 @@ def get_receipt_summary(conn: sqlite3.Connection, receipt_id: int) -> dict | Non
         }
         for r in expense_rows
     ]
-    total = sum(e["amount"] for e in expenses)
+    total = sum(float(e["amount"]) for e in expenses)
     currency = expenses[0]["currency"] if expenses else ""
 
     return {
