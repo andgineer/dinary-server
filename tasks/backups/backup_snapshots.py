@@ -138,7 +138,7 @@ def format_frozen_replica_line(result):
     return (
         f"FAIL: {result['newest']} and {result['prev']} are both {size_kb:.1f} KB"
         " — Litestream replica appears frozen (exchange rates change daily)."
-        " Run `inv healthcheck --remote` to confirm, then `inv replica-resync` to fix."
+        " Run `inv healthcheck --prod` to confirm, then `inv replica-resync` to fix."
     )
 
 

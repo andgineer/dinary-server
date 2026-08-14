@@ -1,85 +1,141 @@
-"""Shared helpers for restore-primary, restore-replica, and restore-yadisk."""
+"""Shared restore helpers: database summaries, the confirmation prompt, and the
+local file swap. The prod-side pipeline lives in :mod:`tasks.backups.restore_prod`."""
 
 import re
-import subprocess
+import sqlite3
 import sys
+import tempfile
+from collections.abc import Generator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from tasks.backups.backup_snapshots import sqlite_row_count
-from tasks.devtools.constants import (
-    _REMOTE_LITESTREAM_SHADOW_PATH,
-    REPLICA_DB_NAME,
-    REPLICA_LITESTREAM_DIR,
-    VM1_LITESTREAM_KEY_PATH,
+from tasks.backups.restore_prod import apply_restore_to_prod
+from tasks.ssh_utils import sqlite_backup_prologue, ssh_capture
+
+PROD_CONFIRM_WORD = "prod"
+LOCAL_CONFIRM_WORD = "yes"
+
+# Ordering goes through datetime(): stored values carry a UTC offset that shifts with DST,
+# so a plain string comparison mis-sorts the hour around each switch. The newest expense is
+# still displayed as stored.
+_SUMMARY_SQL = (
+    "SELECT COUNT(*) || '|' ||"
+    " COALESCE((SELECT datetime FROM expenses ORDER BY datetime(datetime) DESC LIMIT 1), '')"
+    " || '|' ||"
+    " COALESCE(SUM(CASE WHEN datetime(datetime) > datetime('{cutoff}') THEN 1 ELSE 0 END), 0)"
+    " FROM expenses"
 )
 
-_LITESTREAM_CONFIG = Path("/etc/litestream.yml")
+_TIMESTAMP_RE = re.compile(r"^[0-9T :.+-]*$")
 
 
-def confirm_overwrite(target: Path, incoming_desc: str, yes: bool) -> None:
-    """Print existing DB stats and prompt for confirmation. Exits non-zero on refusal."""
-    row_count = sqlite_row_count(target)
-    size_kb = target.stat().st_size / 1024
-    mtime = datetime.fromtimestamp(target.stat().st_mtime, tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
-    print(
-        f"About to overwrite {target} ({row_count:,} expense rows, "
-        f"{size_kb:,.1f} KB, mtime {mtime})\n"
-        f"with {incoming_desc}.\n"
-        f"Previous file will be saved as {target.name}.before-restore-<UTC-ISO>.\n"
-        f"WARNING: stop the server before proceeding to avoid WAL corruption.",
+@dataclass(frozen=True)
+class DbSummary:
+    """Row count, newest expense, and how many expenses are newer than a cutoff."""
+
+    label: str
+    rows: int
+    last_expense: str = ""
+    newer_than_cutoff: int = 0
+
+    def describe(self) -> str:
+        if not self.rows:
+            return f"{self.label}: empty"
+        return f"{self.label}: {self.rows:,} expenses, last {self.last_expense or 'unknown'}"
+
+
+def _summary_sql(cutoff: str) -> str:
+    """The cutoff is read from a database, but it ends up inside a double-quoted
+    argument of a remote shell command — reject anything that could break out."""
+    if not _TIMESTAMP_RE.match(cutoff):
+        msg = f"unexpected timestamp {cutoff!r}"
+        raise ValueError(msg)
+    return _SUMMARY_SQL.format(cutoff=cutoff)
+
+
+def _parse_summary(raw: str, label: str) -> DbSummary:
+    rows, last, newer = ([*raw.strip().split("|", 2), "", ""])[:3]
+    return DbSummary(
+        label=label,
+        rows=int(rows or 0),
+        last_expense=last,
+        newer_than_cutoff=int(newer or 0),
     )
-    if not yes:
-        answer = input("Type 'yes' to proceed: ").strip()
-        if answer != "yes":
-            sys.stderr.write("Aborted.\n")
-            sys.exit(1)
 
 
-def litestream_active() -> bool:
-    """Return True when litestream.service is running on this machine (i.e. we are on VM1)."""
-    result = subprocess.run(
-        ["systemctl", "is-active", "--quiet", "litestream"],
-        check=False,
+def summarize_db_file(path: Path, label: str, cutoff: str = "") -> DbSummary:
+    """Summarize a local SQLite file. An unreadable file summarizes as empty — the
+    result only feeds a confirmation prompt."""
+    try:
+        with sqlite3.connect(path) as con:
+            raw = con.execute(_summary_sql(cutoff)).fetchone()[0]
+    except sqlite3.Error:
+        return DbSummary(label=label, rows=0)
+    return _parse_summary(str(raw), label)
+
+
+def summarize_prod_db(c, label: str = "Prod", cutoff: str = "") -> DbSummary:
+    """Summarize the production database over SSH, reading a ``.backup`` snapshot so
+    the counts are not taken mid-transaction."""
+    raw = ssh_capture(
+        c,
+        sqlite_backup_prologue("dinary-restore-summary")
+        + f'sqlite3 "$SNAP" "{_summary_sql(cutoff)}"',
     )
-    return result.returncode == 0
+    return _parse_summary(raw, label)
 
 
-def _parse_vm2_ssh_target(config_path: Path | None = None) -> str:
-    """Extract ``user@host`` for VM2 from the litestream config written by ``inv setup-replica``."""
-    if config_path is None:
-        config_path = _LITESTREAM_CONFIG
-    text = config_path.read_text(encoding="utf-8")
-    host_m = re.search(r"^\s+host:\s+(\S+):22\s*$", text, re.MULTILINE)
-    user_m = re.search(r"^\s+user:\s+(\S+)\s*$", text, re.MULTILINE)
-    if not host_m or not user_m:
-        raise ValueError(f"Cannot parse VM2 SSH target from {config_path}")
-    return f"{user_m.group(1)}@{host_m.group(1)}"
+def render_restore_plan(current: DbSummary, incoming: DbSummary) -> str:
+    """Both sides plus what the restore drops, so a stale snapshot is visible as a
+    number rather than as silently missing rows afterwards."""
+    lines = [current.describe(), incoming.describe()]
+    if current.newer_than_cutoff:
+        lines.append(
+            f"Losing: {current.newer_than_cutoff:,} expenses recorded after "
+            f"{incoming.last_expense}",
+        )
+    return "\n".join(lines)
 
 
-def local_replica_resync(c) -> None:
-    """Resync VM2 from VM1 without routing through the developer machine.
+def confirm_restore(word: str, *, yes: bool = False) -> None:
+    """``--yes`` is honoured for a local target only: on prod the prompt exists so the
+    diff gets read, and a flag left in shell history cannot stand in for that."""
+    if yes and word == LOCAL_CONFIRM_WORD:
+        return
+    answer = input(f"Type '{word}' to proceed: ").strip()
+    if answer != word:
+        sys.stderr.write("Aborted.\n")
+        sys.exit(1)
 
-    Equivalent to ``inv replica-resync`` but runs entirely on VM1:
-    stops the local litestream service, wipes the stale LTX trees on
-    both sides, then restarts.
-    Called automatically by restore tasks when litestream is active.
-    """
-    vm2 = _parse_vm2_ssh_target()
-    replica_dir = f"{REPLICA_LITESTREAM_DIR}/{REPLICA_DB_NAME}"
-    print("=== Stopping litestream on VM1 ===")
-    c.run("sudo systemctl stop litestream")
-    print("=== Wiping stale LTX shadow tree on VM1 ===")
-    c.run(f"rm -rf {_REMOTE_LITESTREAM_SHADOW_PATH}")
-    print(f"=== Wiping stale LTX tree on {vm2} ===")
-    c.run(f"ssh -i {VM1_LITESTREAM_KEY_PATH} {vm2} 'rm -rf {replica_dir}'")
-    print("=== Starting litestream on VM1 (will push fresh snapshot) ===")
-    c.run("sudo systemctl start litestream")
-    c.run(
-        "sleep 5 && systemctl is-active litestream && "
-        "sudo journalctl -u litestream -n 20 --no-pager",
+
+@contextmanager
+def staged_db(db_bytes: bytes) -> Generator[Path]:
+    """Materialize restored bytes as a file so they can be summarized (and, for prod,
+    uploaded) before anything is overwritten."""
+    with tempfile.TemporaryDirectory() as workdir:
+        path = Path(workdir) / "incoming.db"
+        path.write_bytes(db_bytes)
+        yield path
+
+
+def run_restore(c, staged: Path, *, incoming_label: str, target: Path, prod: bool, yes: bool):
+    """Show both sides, confirm, then write the staged database to the chosen target."""
+    incoming = summarize_db_file(staged, incoming_label)
+    current = (
+        summarize_prod_db(c, cutoff=incoming.last_expense)
+        if prod
+        else summarize_db_file(target, str(target), cutoff=incoming.last_expense)
     )
-    print("=== Replica resync done ===")
+    print(render_restore_plan(current, incoming))
+    confirm_restore(PROD_CONFIRM_WORD if prod else LOCAL_CONFIRM_WORD, yes=yes)
+    if prod:
+        apply_restore_to_prod(c, staged)
+        print(f"=== {summarize_prod_db(c, label='Prod now holds').describe()} ===")
+    else:
+        apply_restore(staged.read_bytes(), target)
+        print(f"=== Restored {target} ===")
 
 
 def apply_restore(db_bytes: bytes, target: Path) -> None:

@@ -1,8 +1,7 @@
-"""Tests for ``inv verify-db``, ``inv restore-yoyo``, and ``inv restore-litestream``
-in :mod:`tasks.db`.
+"""Tests for ``inv verify-db`` and ``inv restore-yoyo`` in :mod:`tasks.db`.
 
-Local verify-db path uses real SQLite files on ``tmp_path``. The restore tasks
-are shell-only: SSH calls are stubbed so tests pin command shape and guard
+Local verify-db path uses real SQLite files on ``tmp_path``. The restore-yoyo task
+is shell-only: SSH calls are stubbed so tests pin command shape and guard
 conditions without touching a real server.
 """
 
@@ -23,8 +22,8 @@ class TestVerifyDbLocal:
     reorders the two PRAGMA statements or drops the output-line check is caught."""
 
     @staticmethod
-    def _verify_db(c, *, remote: bool = False) -> None:
-        return tasks.verify_db.body(c, remote=remote)
+    def _verify_db(c, *, prod: bool = False) -> None:
+        return tasks.verify_db.body(c, prod=prod)
 
     @pytest.fixture
     def _cwd(self, tmp_path, monkeypatch):
@@ -97,7 +96,7 @@ class TestVerifyDbLocal:
 
 @allure.epic("Infrastructure")
 @allure.feature("Deploy")
-class TestVerifyDbRemote:
+class TestVerifyDbProd:
     """The exact emitted shell command is the contract — reordering or dropping
     either pragma would silently hide post-migration data corruption. Shell-only
     is enough here; the Python side is already covered by ``TestVerifyDbLocal``."""
@@ -117,8 +116,8 @@ class TestVerifyDbRemote:
         monkeypatch.setattr(tasks.db, "ssh_capture_bytes", fake_bytes)
         return spy
 
-    def test_remote_snapshots_live_db_before_pragma_checks(self, _spy):
-        tasks.verify_db.body(MagicMock(), remote=True)
+    def test_prod_snapshots_live_db_before_pragma_checks(self, _spy):
+        tasks.verify_db.body(MagicMock(), prod=True)
         cmd = _spy.cmd or ""
         # set -e so a failed backup doesn't silently run pragmas on stale /tmp residue.
         assert cmd.startswith("set -e; ")
@@ -128,28 +127,28 @@ class TestVerifyDbRemote:
         assert 'trap "rm -f \\"$SNAP\\"" EXIT' in cmd
         assert cmd.index("trap") < cmd.index("sqlite3")
 
-    def test_remote_runs_both_pragma_checks_against_snapshot(self, _spy):
-        tasks.verify_db.body(MagicMock(), remote=True)
+    def test_prod_runs_both_pragma_checks_against_snapshot(self, _spy):
+        tasks.verify_db.body(MagicMock(), prod=True)
         cmd = _spy.cmd or ""
         # Must target $SNAP, not the live DB path (would race WAL checkpoints).
         assert 'sqlite3 "$SNAP" "PRAGMA integrity_check; PRAGMA foreign_key_check;"' in cmd
 
-    def test_remote_propagates_pragma_failure_as_exit_1(self, _spy, capsys):
+    def test_prod_propagates_pragma_failure_as_exit_1(self, _spy, capsys):
         """When the remote snapshot reports any issue, the local side
         must still honour the ``lines == ["ok"]`` contract and exit 1
         with the pragma output visible to the operator.
         """
         _spy.payload = b"ok\nchild|1|parent|0\n"
         with pytest.raises(SystemExit) as excinfo:
-            tasks.verify_db.body(MagicMock(), remote=True)
+            tasks.verify_db.body(MagicMock(), prod=True)
         assert excinfo.value.code == 1
         captured = capsys.readouterr()
         assert "child|1|parent|0" in captured.out
         assert "=== verify-db FAILED ===" in captured.err
 
-    def test_remote_reports_ok_when_snapshot_is_healthy(self, _spy, capsys):
+    def test_prod_reports_ok_when_snapshot_is_healthy(self, _spy, capsys):
         _spy.payload = b"ok\n"
-        tasks.verify_db.body(MagicMock(), remote=True)
+        tasks.verify_db.body(MagicMock(), prod=True)
         out = capsys.readouterr().out
         assert "=== verify-db OK ===" in out
 
@@ -222,73 +221,3 @@ class TestRestoreYoyo:
         assert "yoyo rollback" in cmd
         assert "--batch" in cmd
         assert "-r 0002_add_something" in cmd
-
-
-@allure.epic("Infrastructure")
-@allure.feature("Deploy")
-class TestRestoreLitestream:
-    """``inv restore-litestream --at=<iso8601>`` restores the server DB from WAL.
-
-    SSH calls are stubbed. Both dinary and litestream must be stopped before
-    the task proceeds; tests verify each guard independently.
-    """
-
-    @pytest.fixture
-    def _services_inactive(self, monkeypatch):
-        monkeypatch.setattr(tasks.db, "ssh_capture", lambda c, cmd: "inactive\n")
-
-    @pytest.fixture
-    def _dinary_active(self, monkeypatch):
-        def _capture(c, cmd):
-            return "active\n" if "dinary" in cmd else "inactive\n"
-
-        monkeypatch.setattr(tasks.db, "ssh_capture", _capture)
-
-    @pytest.fixture
-    def _litestream_active(self, monkeypatch):
-        def _capture(c, cmd):
-            return "active\n" if "litestream" in cmd else "inactive\n"
-
-        monkeypatch.setattr(tasks.db, "ssh_capture", _capture)
-
-    @pytest.fixture
-    def _ssh_run_spy(self, monkeypatch):
-        calls: list[str] = []
-        monkeypatch.setattr(tasks.db, "ssh_run", lambda c, cmd: calls.append(cmd))
-        return calls
-
-    def test_invalid_at_exits_1(self, capsys):
-        with pytest.raises(SystemExit) as excinfo:
-            tasks.restore_litestream.body(MagicMock(), at="not-a-date")
-        assert excinfo.value.code == 1
-        assert "not-a-date" in capsys.readouterr().err
-
-    def test_dinary_running_exits_1_without_restore(self, _dinary_active, _ssh_run_spy, capsys):
-        with pytest.raises(SystemExit) as excinfo:
-            tasks.restore_litestream.body(MagicMock(), at="2026-06-22 14:30")
-        assert excinfo.value.code == 1
-        err = capsys.readouterr().err
-        assert "dinary" in err
-        assert _ssh_run_spy == []
-
-    def test_litestream_running_exits_1_without_restore(
-        self, _litestream_active, _ssh_run_spy, capsys
-    ):
-        with pytest.raises(SystemExit) as excinfo:
-            tasks.restore_litestream.body(MagicMock(), at="2026-06-22 14:30")
-        assert excinfo.value.code == 1
-        err = capsys.readouterr().err
-        assert "litestream" in err
-        assert _ssh_run_spy == []
-
-    def test_happy_path_runs_litestream_restore_then_mv(self, _services_inactive, _ssh_run_spy):
-        tasks.restore_litestream.body(MagicMock(), at="2026-06-22 14:30")
-        assert len(_ssh_run_spy) == 2
-        assert "litestream restore" in _ssh_run_spy[0]
-        assert "2026-06-22T14:30:00Z" in _ssh_run_spy[0]
-        assert "mv" in _ssh_run_spy[1]
-
-    def test_z_suffix_in_at_is_accepted(self, _services_inactive, _ssh_run_spy):
-        tasks.restore_litestream.body(MagicMock(), at="2026-06-22T14:30:00Z")
-        assert len(_ssh_run_spy) == 2
-        assert "2026-06-22T14:30:00Z" in _ssh_run_spy[0]

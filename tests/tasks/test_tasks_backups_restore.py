@@ -11,12 +11,14 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import allure
 import pytest
 
 import tasks
+import tasks.backups.backup_snapshots
 import tasks.backups.backups_restore
 from tasks.backups.backup_retention import _make_pattern
 from tasks.backups.backup_snapshots import (
@@ -151,12 +153,10 @@ class TestRestoreFromYadiskTask:
 
     @pytest.fixture
     def _mock_binaries_present(self, monkeypatch):
-        """Pre-flight passes; stubs ``litestream_active`` to False (developer
-        laptop, skip resync) and ``ensure_local_yandex_rclone_configured``."""
+        """Pre-flight passes: local binaries present and the rclone remote configured."""
         monkeypatch.setattr(
-            tasks.backups.backups_restore.shutil, "which", lambda name: f"/fake/{name}"
+            tasks.backups.backup_snapshots.shutil, "which", lambda name: f"/fake/{name}"
         )
-        monkeypatch.setattr(tasks.backups.backups_restore, "litestream_active", lambda: False)
         monkeypatch.setattr(
             tasks.backups.backups_restore, "ensure_local_yandex_rclone_configured", lambda: None
         )
@@ -358,7 +358,7 @@ class TestRestoreFromYadiskTask:
         single consolidated error message, not fail mid-pipeline
         after the download has already started.
         """
-        monkeypatch.setattr(tasks.backups.backups_restore.shutil, "which", lambda name: None)
+        monkeypatch.setattr(tasks.backups.backup_snapshots.shutil, "which", lambda name: None)
         with pytest.raises(SystemExit) as excinfo:
             tasks.restore_from_yadisk.body(MagicMock())
         assert excinfo.value.code == 1
@@ -391,19 +391,17 @@ class TestRestoreFromYadiskTask:
 
 @allure.epic("Infrastructure")
 @allure.feature("Backup")
-@allure.story("Cloud restore")
-class TestRestoreFromYadiskResync:
-    """Verify that the post-restore resync is triggered on VM1 (litestream active)
-    and silently skipped on a developer laptop (litestream inactive).
-    """
+@allure.story("Restore to prod")
+class TestRestoreFromYadiskTarget:
+    """The snapshot is downloaded and verified before either target is touched, and
+    ``--prod`` is what decides which one that is."""
 
     @pytest.fixture
     def _patched(self, monkeypatch, tmp_path):
-        """Stub out everything except the resync logic under test."""
         (tmp_path / "data").mkdir()
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
-            tasks.backups.backups_restore.shutil, "which", lambda name: f"/fake/{name}"
+            tasks.backups.backup_snapshots.shutil, "which", lambda name: f"/fake/{name}"
         )
         monkeypatch.setattr(
             tasks.backups.backups_restore, "ensure_local_yandex_rclone_configured", lambda: None
@@ -413,48 +411,40 @@ class TestRestoreFromYadiskResync:
             "yadisk_list_snapshots",
             lambda: [("dinary-2026-04-22T0317Z.db.zst", 1000)],
         )
-
-        def fake_download(c, picked, workpath):
-            import sqlite3
-
-            db = workpath / "restored.db"
-            con = sqlite3.connect(str(db))
-            try:
-                con.execute("CREATE TABLE expense (id INTEGER PRIMARY KEY)")
-                con.commit()
-            finally:
-                con.close()
-            return db
-
-        monkeypatch.setattr(tasks.backups.backups_restore, "_download_and_verify", fake_download)
+        monkeypatch.setattr(
+            tasks.backups.backups_restore,
+            "_download_and_verify",
+            lambda c, picked, workpath: workpath / "restored.db",
+        )
         return monkeypatch
 
-    def test_resync_triggered_when_litestream_active(self, _patched):
-        """On VM1 (litestream active), resync must be called after restore."""
-        resync_calls = []
-        _patched.setattr(tasks.backups.backups_restore, "litestream_active", lambda: True)
-        _patched.setattr(
-            tasks.backups.backups_restore, "local_replica_resync", lambda c: resync_calls.append(c)
+    def _capture(self, patched):
+        calls = []
+        patched.setattr(
+            tasks.backups.backups_restore,
+            "run_restore",
+            lambda _c, _staged, **kw: calls.append(kw),
         )
-        tasks.restore_from_yadisk.body(MagicMock(), yes=True)
-        assert len(resync_calls) == 1
+        return calls
 
-    def test_resync_skipped_when_litestream_inactive(self, _patched):
-        """On a developer laptop (litestream not running), resync must be skipped."""
-        resync_calls = []
-        _patched.setattr(tasks.backups.backups_restore, "litestream_active", lambda: False)
-        _patched.setattr(
-            tasks.backups.backups_restore, "local_replica_resync", lambda c: resync_calls.append(c)
-        )
+    def test_defaults_to_the_local_database(self, _patched):
+        calls = self._capture(_patched)
         tasks.restore_from_yadisk.body(MagicMock(), yes=True)
-        assert resync_calls == []
+        assert calls[0]["prod"] is False
+        assert calls[0]["target"] == Path("data/dinary.db")
 
-    def test_resync_skipped_when_no_resync_flag(self, _patched):
-        """``--no-resync`` must suppress the resync even when litestream is active."""
-        resync_calls = []
-        _patched.setattr(tasks.backups.backups_restore, "litestream_active", lambda: True)
-        _patched.setattr(
-            tasks.backups.backups_restore, "local_replica_resync", lambda c: resync_calls.append(c)
-        )
-        tasks.restore_from_yadisk.body(MagicMock(), yes=True, no_resync=True)
-        assert resync_calls == []
+    def test_prod_flag_is_forwarded(self, _patched):
+        calls = self._capture(_patched)
+        tasks.restore_from_yadisk.body(MagicMock(), prod=True)
+        assert calls[0]["prod"] is True
+
+    def test_snapshot_name_reaches_the_confirmation_label(self, _patched):
+        """The operator picks between snapshots by name; the plan must say which one."""
+        calls = self._capture(_patched)
+        tasks.restore_from_yadisk.body(MagicMock(), yes=True)
+        assert "dinary-2026-04-22T0317Z.db.zst" in calls[0]["incoming_label"]
+
+    def test_list_only_never_restores(self, _patched, capsys):
+        calls = self._capture(_patched)
+        tasks.restore_from_yadisk.body(MagicMock(), list_only=True)
+        assert calls == []

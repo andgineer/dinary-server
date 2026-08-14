@@ -2,13 +2,13 @@
 (``_build_setup_replica_*``), the :func:`setup_replica` orchestrator, and
 post-restore housekeeping (:func:`replica_resync`, :func:`replica_restore_db`)."""
 
+import sys
 from pathlib import Path
 
 from invoke import task
 
 from tasks.devtools.constants import (
     _REMOTE_DB_PATH,
-    _REMOTE_LITESTREAM_SHADOW_PATH,
     BACKUP_FILENAME_PREFIX,
     BACKUP_FILENAME_SUFFIX,
     BACKUP_RCLONE_PATH,
@@ -48,7 +48,8 @@ from tasks.ssh_utils import (
 )
 
 from .backups_yandex import ensure_yandex_rclone_configured
-from .restore_utils import apply_restore, confirm_overwrite, litestream_active, local_replica_resync
+from .restore_prod import start_litestream, stop_litestream, wipe_ltx_trees
+from .restore_utils import run_restore, staged_db
 
 
 def _replica_sftp_host() -> str:
@@ -324,48 +325,34 @@ def _build_replica_restore_script(timestamp: str | None) -> str:
 
 @task(name="replica-resync")
 def replica_resync(c):
-    """Resync VM2 replica after a DB restore or WAL txid mismatch.
+    """Resync VM2 replica after a WAL txid mismatch.
 
-    Runs automatically after restore tasks unless --no-resync is passed.
+    A restore with --prod resyncs on its own; this task is for the standalone case.
     See https://andgineer.github.io/dinary/operations for when to run manually.
     """
-    print("=== Stopping litestream on VM1 ===")
-    ssh_run(c, "sudo systemctl stop litestream")
-    print("=== Wiping stale LTX shadow tree on VM1 ===")
-    ssh_run(c, f"rm -rf {_REMOTE_LITESTREAM_SHADOW_PATH}")
-    print(f"=== Wiping stale LTX tree on {replica_host()} ===")
-    ssh_replica(c, f"rm -rf {REPLICA_LITESTREAM_DIR}/{REPLICA_DB_NAME}")
-    print("=== Starting litestream on VM1 (will push fresh snapshot) ===")
-    ssh_run(c, "sudo systemctl start litestream")
-    ssh_run(
-        c,
-        "sleep 5 && systemctl is-active litestream && "
-        "sudo journalctl -u litestream -n 20 --no-pager",
-    )
+    stop_litestream(c)
+    wipe_ltx_trees(c)
+    start_litestream(c)
     print("=== Replica resync done ===")
 
 
 @task(name="restore-replica")
-def restore_replica(c, output=None, yes=False, timestamp=None, no_resync=False):
-    """Restore a snapshot from VM2's Litestream LTX archive to data/dinary.db.
+def restore_replica(c, output=None, yes=False, timestamp=None, prod=False):
+    """Restore a snapshot from VM2's Litestream LTX archive.
 
-    More current than restore-yadisk (WAL-level vs daily Yandex.Disk).
-    Flags: -o PATH, --yes, --timestamp ISO8601 (default: latest), --no-resync.
+    More current than restore-yadisk (WAL-level vs daily Yandex.Disk). Writes
+    data/dinary.db by default; --prod replaces the production database instead.
+    Flags: -o PATH, --yes, --timestamp ISO8601 (default: latest), --prod.
     See https://andgineer.github.io/dinary/operations for restore runbooks.
     """
+    if prod and output:
+        sys.stderr.write("--output names a local file and cannot be combined with --prod.\n")
+        sys.exit(1)
     target = Path(output) if output else Path("data/dinary.db")
-    incoming_desc = (
-        f"snapshot from VM2 LTX archive at {timestamp}"
-        if timestamp
-        else "latest snapshot from VM2 LTX archive"
-    )
-    if target.exists() and target.stat().st_size > 0:
-        confirm_overwrite(target, incoming_desc, yes)
+    label = f"VM2 LTX archive at {timestamp}" if timestamp else "VM2 LTX archive (latest)"
     print(f"=== Restoring from {replica_host()} LTX archive ===")
     if timestamp:
         print(f"=== Point-in-time: {timestamp} ===")
     db_bytes = ssh_replica_capture_bytes(_build_replica_restore_script(timestamp))
-    apply_restore(db_bytes, target)
-    print(f"=== Restored {len(db_bytes) / 1024:.1f} KB → {target} ===")
-    if litestream_active() and not no_resync:
-        local_replica_resync(c)
+    with staged_db(db_bytes) as staged:
+        run_restore(c, staged, incoming_label=label, target=target, prod=prod, yes=yes)

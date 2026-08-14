@@ -119,7 +119,7 @@ def render_csv(rows: list[IncomeSummaryRow], *, stream: TextIO) -> None:
 
 
 def render_json(rows: Iterable[IncomeSummaryRow], *, stream: TextIO) -> None:
-    """Wire format for ``inv report-income --remote``. ``Decimal`` values serialize
+    """Wire format for ``inv report-income --prod``. ``Decimal`` values serialize
     as canonical strings, not float, to avoid silent precision loss; use
     :func:`rows_from_json` to round-trip bit-exact. ``ensure_ascii=False`` keeps
     Cyrillic fields as UTF-8 on the wire."""
@@ -186,7 +186,7 @@ def run(
         msg = (
             f"DB not found at {storage.DB_PATH}. Either point "
             "DINARY_DATA_PATH at an existing SQLite file, or use "
-            "`inv report-income --remote` to query the server."
+            "`inv report-income --prod` to query the server."
         )
         print(msg, file=sys.stderr)
         return 1
@@ -215,8 +215,7 @@ def main(argv: list[str] | None = None) -> int:
         "--json",
         action="store_true",
         help=(
-            "emit a JSON array of rows to stdout (wire format used by "
-            "``inv report-income --remote``)"
+            "emit a JSON array of rows to stdout (wire format used by ``inv report-income --prod``)"
         ),
     )
     args = parser.parse_args(argv)

@@ -85,6 +85,20 @@ def ssh_replica_capture_bytes(cmd):
 # ---------------------------------------------------------------------------
 
 
+def upload_remote_bytes(local_path: Path, remote_path: str) -> None:
+    """Stream a local file to ``remote_path`` on the main host through ssh stdin.
+
+    The base64-in-argv transport the other helpers use would exceed ``ARG_MAX`` on a
+    multi-megabyte database.
+    """
+    with local_path.open("rb") as handle:
+        subprocess.run(
+            ["ssh", host(), f"cat > {shlex.quote(remote_path)}"],
+            stdin=handle,
+            check=True,
+        )
+
+
 def write_remote_file(c, path, content):
     """Write ``content`` to ``path`` on the main host via ``sudo tee``."""
     b64 = base64.b64encode(content.encode()).decode()
@@ -397,7 +411,7 @@ def sqlite_backup_prologue(snap_prefix):
 
 
 # ---------------------------------------------------------------------------
-# Remote snapshot command (for report / sql --remote)
+# Remote snapshot command (for report / sql --prod)
 # ---------------------------------------------------------------------------
 
 

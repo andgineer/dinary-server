@@ -15,12 +15,12 @@ from tasks.reports.report_helpers import extract_format_flags, extract_year_mont
 from tasks.ssh_utils import remote_snapshot_cmd, ssh_capture_bytes
 
 
-def _run_report_module(c, module: str, flags: list[str], *, remote: bool) -> None:
+def _run_report_module(c, module: str, flags: list[str], *, prod: bool) -> None:
     """Local: fetch + render in one process. Remote: the module runs on the server
     in ``--json`` mode over SSH and rendering happens locally — JSON as the wire
     format means a single end-of-stream UTF-8 decode keeps Cyrillic intact regardless
     of how SSH chunks the stream."""
-    if not remote:
+    if not prod:
         cmd = f"uv run python -m tasks.reports.{module}"
         if flags:
             cmd = f"{cmd} {' '.join(flags)}"
@@ -57,8 +57,8 @@ def _run_report_module(c, module: str, flags: list[str], *, remote: bool) -> Non
 
 
 @task(name="report-expenses")
-def report_expenses(c, year="", month="", csv=False, remote=False):  # noqa: A002
-    """Show expenses by (category, event, tags). Flags: --year, --month, --csv, --remote."""
+def report_expenses(c, year="", month="", csv=False, prod=False):  # noqa: A002
+    """Show expenses by (category, event, tags). Flags: --year, --month, --csv, --prod."""
     if year and month:
         print("--year and --month are mutually exclusive", file=sys.stderr)
         sys.exit(1)
@@ -70,16 +70,16 @@ def report_expenses(c, year="", month="", csv=False, remote=False):  # noqa: A00
         flags.extend(["--month", shlex.quote(month)])
     if csv:
         flags.append("--csv")
-    _run_report_module(c, "expenses", flags, remote=remote)
+    _run_report_module(c, "expenses", flags, prod=prod)
 
 
 @task(name="report-income")
-def report_income(c, csv=False, remote=False):  # noqa: A002
-    """Show income by year. Flags: --csv, --remote."""
+def report_income(c, csv=False, prod=False):  # noqa: A002
+    """Show income by year. Flags: --csv, --prod."""
     flags: list[str] = []
     if csv:
         flags.append("--csv")
-    _run_report_module(c, "income", flags, remote=remote)
+    _run_report_module(c, "income", flags, prod=prod)
 
 
 def _run_local_sql(c, sql_text: str, csv: bool, json_mode: bool, write: bool) -> None:
@@ -121,37 +121,36 @@ def _run_remote_sql(sql_text: str, csv: bool, json_mode: bool) -> None:
         "json": ("Emit JSON envelope {columns, rows, row_count} to stdout. Mutex with --csv."),
         "write": (
             "Open the DB read-write so UPDATE/DELETE/INSERT can run. "
-            "Off by default; forbidden with --remote."
+            "Off by default; forbidden with --prod."
         ),
-        "remote": (
+        "prod": (
             "Run against a /tmp snapshot of the prod DB over SSH instead of local data/dinary.db."
         ),
     },
 )
-def sql_query(c, query="", file="", csv=False, json=False, write=False, remote=False):  # noqa: A002
+def sql_query(c, query="", file="", csv=False, json=False, write=False, prod=False):  # noqa: A002
     """Run a SQL query against data/dinary.db (read-only by default).
 
     Examples:
         inv sql -q "SELECT * FROM app_metadata ORDER BY key"
         inv sql -q "DELETE FROM expenses WHERE id = 999" --write
         inv sql -f scripts/summary.sql --csv > out.csv
-        inv sql -q "SELECT * FROM app_metadata" --remote
+        inv sql -q "SELECT * FROM app_metadata" --prod
     """
 
     if csv and json:
         raise SystemExit("--csv and --json are mutually exclusive")
     if bool(query) == bool(file):
         raise SystemExit("exactly one of --query / --file is required")
-    if write and remote:
+    if write and prod:
         raise SystemExit(
-            "--write is not allowed with --remote: the remote runs against a "
-            "/tmp snapshot that is torn down on exit, so any mutations would "
-            "be silently discarded. SSH to the host and run `inv sql --write` "
-            "there, or write a proper migration.",
+            "--write is not allowed with --prod: the query runs against a /tmp "
+            "snapshot that is torn down on exit, so any mutation would be silently "
+            "discarded rather than applied. Change production data with a migration.",
         )
 
     sql_text = Path(file).read_text(encoding="utf-8") if file else query
-    if not remote:
+    if not prod:
         _run_local_sql(c, sql_text, csv, json, write)
     else:
         _run_remote_sql(sql_text, csv, json)

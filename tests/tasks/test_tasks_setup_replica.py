@@ -3,6 +3,7 @@
 step, the apt/litestream-dir shell builders, the task's step composition, and the
 explicit trust-refresh task used after a VM re-provision."""
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import allure
@@ -527,107 +528,31 @@ class TestReplicaResetTrustTask:
 @allure.feature("Deploy")
 @allure.story("Replica setup")
 class TestSetupResyncTask:
-    """Litestream runs on VM1 (not VM2): stop replicator on VM1, wipe the LTX
-    tree on VM2, start replicator on VM1."""
+    """The task is now composition only — the shell of each step is pinned in
+    :file:`test_tasks_restore_prod.py`; what matters here is that the three steps
+    run, and in an order where neither wipe races the running replicator."""
 
     @pytest.fixture
     def _spy(self, monkeypatch):
-        class Spy:
-            replica_calls: list[str]
-            ssh_calls: list[str]
+        calls: list[str] = []
+        for name in ("stop_litestream", "wipe_ltx_trees", "start_litestream"):
+            monkeypatch.setattr(
+                tasks.backups.backups_replica,
+                name,
+                lambda _c, _name=name: calls.append(_name),
+            )
+        return calls
 
-            def __init__(self) -> None:
-                self.replica_calls = []
-                self.ssh_calls = []
-
-        spy = Spy()
-
-        monkeypatch.setattr(
-            tasks.backups.backups_replica,
-            "ssh_replica",
-            lambda _c, cmd: spy.replica_calls.append(cmd),
-        )
-        monkeypatch.setattr(
-            tasks.backups.backups_replica, "ssh_run", lambda _c, cmd: spy.ssh_calls.append(cmd)
-        )
-        monkeypatch.setattr(
-            tasks.backups.backups_replica, "replica_host", lambda: "ubuntu@dinary-replica"
-        )
-        return spy
-
-    def test_stops_litestream_on_vm1_not_vm2(self, _spy):
-        """Litestream only runs on VM1 — sending stop to VM2 is a no-op
-        that silently leaves the replicator pushing while the LTX tree
-        is being wiped, causing WAL corruption.
-        """
+    def test_wipes_between_stop_and_start(self, _spy):
         tasks.replica_resync.body(MagicMock())
-        assert any("systemctl stop litestream" in c for c in _spy.ssh_calls), (
-            "stop must target VM1 (ssh_run), not VM2"
-        )
-        assert not any("systemctl stop litestream" in c for c in _spy.replica_calls), (
-            "stop must NOT target VM2 (ssh_replica)"
-        )
-
-    def test_wipes_ltx_tree_on_vm2(self, _spy):
-        """Stale LTX left behind makes litestream re-sync to the old txid and
-        the restored primary diverges from the replica immediately."""
-        tasks.replica_resync.body(MagicMock())
-        wipe_call = next(
-            (c for c in _spy.replica_calls if "rm -rf" in c and "litestream" in c),
-            None,
-        )
-        assert wipe_call is not None, "must wipe LTX tree on VM2 via ssh_replica"
-        assert tasks.devtools.constants.REPLICA_LITESTREAM_DIR in wipe_call
-        assert tasks.devtools.constants.REPLICA_DB_NAME in wipe_call
-
-    def test_wipes_shadow_tree_on_vm1(self, _spy):
-        """The shadow tree holds txids from the pre-restore DB. Wiping only VM2 leaves
-        litestream asking for segments that tree never had, so every sync keeps failing."""
-        shadow = tasks.devtools.constants._REMOTE_LITESTREAM_SHADOW_PATH
-        tasks.replica_resync.body(MagicMock())
-        assert any("rm -rf" in c and shadow in c for c in _spy.ssh_calls), (
-            "must wipe the VM1 shadow tree via ssh_run"
-        )
-        assert not any(shadow in c for c in _spy.replica_calls), (
-            "the VM1 shadow path must not be wiped on VM2"
-        )
-
-    def test_wipes_both_sides_between_stop_and_start(self, _spy):
-        """Either wipe landing outside the stop/start window races the running replicator."""
-        tasks.replica_resync.body(MagicMock())
-        stop_idx = next(i for i, c in enumerate(_spy.ssh_calls) if "systemctl stop litestream" in c)
-        start_idx = next(
-            i for i, c in enumerate(_spy.ssh_calls) if "systemctl start litestream" in c
-        )
-        shadow_idx = next(i for i, c in enumerate(_spy.ssh_calls) if "rm -rf" in c)
-        assert stop_idx < shadow_idx < start_idx
-
-    def test_starts_litestream_on_vm1_after_wipe(self, _spy):
-        """Litestream must restart on VM1 AFTER the LTX tree is wiped —
-        starting before the wipe means the replicator sees existing LTX
-        and skips the fresh-push it needs to do.
-        """
-        tasks.replica_resync.body(MagicMock())
-        stop_idx = next(
-            (i for i, c in enumerate(_spy.ssh_calls) if "systemctl stop litestream" in c),
-            None,
-        )
-        start_idx = next(
-            (i for i, c in enumerate(_spy.ssh_calls) if "systemctl start litestream" in c),
-            None,
-        )
-        assert stop_idx is not None
-        assert start_idx is not None
-        assert stop_idx < start_idx, "start must come after stop on VM1"
+        assert _spy == ["stop_litestream", "wipe_ltx_trees", "start_litestream"]
 
 
 @allure.epic("Infrastructure")
 @allure.feature("Backup")
-@allure.story("Restore utils")
-class TestRestoreReplicaResync:
-    """restore-replica auto-resyncs when litestream is active (VM1 context)
-    and skips resync on a developer laptop or when --no-resync is passed.
-    """
+@allure.story("Restore to prod")
+class TestRestoreReplicaTask:
+    """``restore-replica`` writes the local database unless ``--prod`` is given."""
 
     @pytest.fixture
     def _patched(self, monkeypatch, tmp_path):
@@ -646,39 +571,55 @@ class TestRestoreReplicaResync:
             "ssh_replica_capture_bytes",
             lambda script: b"SQLite format 3\x00" + b"\x00" * 96,
         )
-        monkeypatch.setattr(
-            tasks.backups.backups_replica,
-            "apply_restore",
-            lambda db_bytes, target: target.write_bytes(db_bytes),
-        )
         return monkeypatch
 
-    def test_resync_triggered_when_litestream_active(self, _patched):
-        """On VM1 (litestream.service active), resync must fire after restore."""
-        resync_calls = []
-        _patched.setattr(tasks.backups.backups_replica, "litestream_active", lambda: True)
+    def test_local_restore_writes_the_local_database(self, _patched):
+        calls = []
         _patched.setattr(
-            tasks.backups.backups_replica, "local_replica_resync", lambda c: resync_calls.append(c)
+            tasks.backups.backups_replica,
+            "run_restore",
+            lambda _c, staged, **kw: calls.append((staged.read_bytes()[:15], kw)),
         )
         tasks.restore_replica.body(MagicMock(), yes=True)
-        assert len(resync_calls) == 1
+        payload, kwargs = calls[0]
+        assert payload == b"SQLite format 3"
+        assert kwargs["prod"] is False
+        assert kwargs["target"] == Path("data/dinary.db")
 
-    def test_resync_skipped_when_litestream_inactive(self, _patched):
-        """On a developer laptop, resync must be skipped silently."""
-        resync_calls = []
-        _patched.setattr(tasks.backups.backups_replica, "litestream_active", lambda: False)
+    def test_prod_flag_is_forwarded(self, _patched):
+        calls = []
         _patched.setattr(
-            tasks.backups.backups_replica, "local_replica_resync", lambda c: resync_calls.append(c)
+            tasks.backups.backups_replica,
+            "run_restore",
+            lambda _c, _staged, **kw: calls.append(kw),
         )
-        tasks.restore_replica.body(MagicMock(), yes=True)
-        assert resync_calls == []
+        tasks.restore_replica.body(MagicMock(), prod=True)
+        assert calls[0]["prod"] is True
 
-    def test_resync_skipped_when_no_resync_flag(self, _patched):
-        """``--no-resync`` suppresses resync even when litestream is active."""
-        resync_calls = []
-        _patched.setattr(tasks.backups.backups_replica, "litestream_active", lambda: True)
+    def test_timestamp_reaches_the_replica_script_and_the_label(self, _patched):
+        scripts, kwargs = [], []
         _patched.setattr(
-            tasks.backups.backups_replica, "local_replica_resync", lambda c: resync_calls.append(c)
+            tasks.backups.backups_replica,
+            "ssh_replica_capture_bytes",
+            lambda script: scripts.append(script) or (b"SQLite format 3\x00" + b"\x00" * 96),
         )
-        tasks.restore_replica.body(MagicMock(), yes=True, no_resync=True)
-        assert resync_calls == []
+        _patched.setattr(
+            tasks.backups.backups_replica,
+            "run_restore",
+            lambda _c, _staged, **kw: kwargs.append(kw),
+        )
+        tasks.restore_replica.body(MagicMock(), yes=True, timestamp="2026-08-12T07:30:00Z")
+        assert '-timestamp "2026-08-12T07:30:00Z"' in scripts[0]
+        assert "2026-08-12T07:30:00Z" in kwargs[0]["incoming_label"]
+
+    def test_output_with_prod_is_refused(self, _patched):
+        """``--output`` names a local file; silently ignoring it next to ``--prod``
+        would let an operator think the restore went to that path."""
+        _patched.setattr(
+            tasks.backups.backups_replica,
+            "run_restore",
+            lambda *a, **kw: pytest.fail("must not restore anything"),
+        )
+        with pytest.raises(SystemExit) as exc:
+            tasks.restore_replica.body(MagicMock(), prod=True, output="copy.db")
+        assert exc.value.code == 1

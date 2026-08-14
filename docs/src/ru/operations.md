@@ -52,10 +52,10 @@ SQLite предоставляет две прагмы для пост-мигра
 
 ```bash
 inv verify-db            # локальная data/dinary.db
-inv verify-db --remote   # снапшот prod-базы, проверяемый по SSH
+inv verify-db --prod     # снапшот prod-базы, проверяемый по SSH
 ```
 
-`--remote` сначала делает на сервере снапшот через
+`--prod` сначала делает на сервере снапшот через
 `sqlite3 .backup` в `/tmp`, а затем проверяет его, чтобы случайно
 не прочитать живой файл в середине checkpoint-а WAL.
 
@@ -144,7 +144,7 @@ inv setup-replica
 3. Проверьте здоровье репликации:
 
    ```bash
-   inv status --remote
+   inv status --prod
    ```
 
    На здоровом sidecar-е systemd-unit активен, а
@@ -369,6 +369,7 @@ inv restore-yadisk --list-only                     # список снапшот
 inv restore-yadisk                                 # восстановить самый свежий
 inv restore-yadisk --snapshot 2026-03-15           # конкретную дату
 inv restore-yadisk --yes                           # без подтверждения
+inv restore-yadisk --prod                          # восстановить прод-БД
 ```
 
 ### Два предполагаемых сценария
@@ -378,16 +379,14 @@ inv restore-yadisk --yes                           # без подтвержде
   воспроизвести баг на реальных данных. Низкий риск: любой
   перезаписанный отладочный файл восстанавливается из
   автосохранённого `data/dinary.db.before-restore-<ts>`.
-- **Disaster recovery прод-БД.** Запускать задачу на самой VM 1
-  (через SSH), когда и локальная БД, и Litestream-реплика на VM 2
-  непригодны. Тройная защита «SSH + `cd ~/dinary` + интерактивное
-  подтверждение» — это намеренное трение, чтобы одним словом
-  `inv restore-yadisk` в случайном терминале нельзя было
-  молча затереть прод.
+- **Disaster recovery прод-БД.** С флагом `--prod` та же задача
+  восстанавливает сервер, целиком с операторской машины.
 
-`restore-yadisk` — **local-only**: пишет в `./data/dinary.db`
-относительно cwd, режима `--remote` нет. Запустить задачу на
-удалённом хосте с операторской машины невозможно.
+Любая restore-задача без `--prod` пишет в локальную БД, поэтому
+ни случайный терминал, ни промах в tab-completion до прода не
+достают. На самом сервере восстановление не запускается: путь
+`--prod` работает обычными SSH-командами и не зависит от того,
+какая ревизия там сейчас развёрнута.
 
 ### Флаги
 
@@ -395,7 +394,8 @@ inv restore-yadisk --yes                           # без подтвержде
 |---|---|---|
 | `--snapshot DATE` | `latest` | Префикс даты в имени файла, например `2026-04-22` матчит полный `dinary-2026-04-22T0317Z.db.zst` |
 | `--list-only` | off | Read-only: показать инвентарь снапшотов и выйти |
-| `--yes` | off | Пропустить гейт «напечатайте yes» (preserve-before-restore всё равно отработает) |
+| `--prod` | off | Заменить прод-БД вместо локальной |
+| `--yes` | off | Пропустить гейт подтверждения при локальном восстановлении. На `--prod` не действует никогда |
 
 ### Предусловия (разово на машину)
 
@@ -411,39 +411,51 @@ inv restore-yadisk --yes                           # без подтвержде
 
 - Снапшот сначала разжимается во временной директории и
   прогоняется через `PRAGMA integrity_check` **до того**, как
-  вообще тронут существующий `data/dinary.db`. Битый снапшот
-  прерывает ран с нетронутой живой БД.
-- Если `data/dinary.db` существует и непустой, он переименовывается
-  в `data/dinary.db.before-restore-<UTC-ISO>` до того, как на его
-  место ляжет снапшот. Предыдущее состояние всегда восстановимо из
-  той же директории, даже при `--yes`.
+  вообще тронута существующая БД. Битый снапшот прерывает ран с
+  нетронутой живой БД.
+- Перед подтверждением обе базы описываются — число расходов и
+  самый свежий расход с каждой стороны, — и промпт называет,
+  сколько расходов восстановление отбросит. Устаревший снапшот
+  виден как число, а не как молча пропавшие потом записи.
+- Заменяемая БД сохраняется рядом с оригиналом под именем
+  `dinary.db.before-restore-<UTC-ISO>` — локально или на сервере.
+- `--prod` требует напечатать буквально `prod`, и `--yes` этот
+  запрос не отключает.
 
-### Раннбук disaster recovery на проде
+### Раннбук восстановления прода
 
-Когда живая БД на VM 1 потеряна, И Litestream-реплика на VM 2
-тоже непригодна:
+Запускается с операторской машины, задача выбирается по источнику:
 
 ```bash
-ssh ubuntu@dinary                       # или публичный IP / Tailscale IP
-sudo systemctl stop dinary litestream   # чтобы не получить наполовину переписанную БД
-cd ~/dinary
-inv restore-yadisk --snapshot 2026-03-15
-# промпт подтверждения: печатает row count / size / mtime текущей
-# БД плюс сжатый размер входящего снапшота и требует напечатать
-# буквально 'yes'.
-sudo systemctl start litestream dinary  # вернуть запись + репликацию
-inv verify-db                           # integrity + FK check
+inv restore-replica --prod                       # самое свежее: WAL-архив VM2
+inv restore-replica --timestamp 2026-08-12T07:30:00Z --prod  # на момент времени
+inv restore-yadisk --snapshot 2026-03-15 --prod  # суточный офсайт-архив
 ```
 
-Если живая БД просто устарела, но цела, и Яндекс-снапшот нужен
-только для сравнения, запустите задачу в отдельной scratch-
-директории (чтобы `./data/dinary.db` стал снапшотом, а не прод-БД):
+Каждая из них за один запуск: скачивает и проверяет снапшот,
+печатает обе стороны и то, что будет потеряно, спрашивает `prod`,
+останавливает `dinary` и `litestream`, сохраняет текущую БД,
+подменяет файл, пересинхронизирует реплику и поднимает оба
+сервиса — с отчётом о том, что в итоге лежит на проде.
+
+Чтобы посмотреть снапшот до того, как его применять, восстановите
+его сначала локально (без `--prod`), загляните в
+`data/dinary.db`, потом повторите с `--prod`.
+
+Если операторская машина недоступна, тот же результат без этого
+репозитория:
 
 ```bash
-cd /tmp/restore-preview
-mkdir -p data
-inv restore-yadisk --snapshot 2026-03-15 --yes
-sqlite3 data/dinary.db 'SELECT COUNT(*) FROM expense'
+ssh ubuntu@dinary-replica \
+  'litestream restore -config /tmp/ls.yml /tmp/dinary.db'  # из дерева VM2
+scp ubuntu@dinary-replica:/tmp/dinary.db /tmp/dinary.db
+ssh ubuntu@dinary 'sudo systemctl stop dinary litestream'
+scp /tmp/dinary.db ubuntu@dinary:/home/ubuntu/dinary/data/dinary.db
+ssh ubuntu@dinary 'rm -f /home/ubuntu/dinary/data/dinary.db-wal \
+  /home/ubuntu/dinary/data/dinary.db-shm \
+  && rm -rf /home/ubuntu/dinary/data/.dinary.db-litestream'
+ssh ubuntu@dinary-replica 'rm -rf /var/lib/litestream/dinary'
+ssh ubuntu@dinary 'sudo systemctl start litestream dinary'
 ```
 
 ## Восстановление из холодной копии
@@ -461,8 +473,8 @@ sqlite3 data/dinary.db 'SELECT COUNT(*) FROM expense'
 
 ```bash
 inv deploy --ref=v0.4.0 --no-start   # задеплоить код, сервис не запускать
-inv restore-yadisk              # восстановить БД с Яндекс.Диска
-inv restart-server                    # запустить; yoyo применит прямые миграции
+inv restore-yadisk --prod            # восстановить БД сервера с Яндекс.Диска
+inv restart-server                   # запустить; yoyo применит прямые миграции
 ```
 
 ## Координированный сброс импорта
@@ -498,7 +510,7 @@ inv setup-reset-trust
 
 ```bash
 inv healthcheck            # локальная data/dinary.db
-inv healthcheck --remote   # прод по SSH
+inv healthcheck --prod   # прод по SSH
 ```
 
 Проверяет: активность systemd-сервисов, совпадение page_count реплики с первичной БД,
@@ -518,14 +530,14 @@ inv report-expenses                   # расходы по (категория,
 inv report-expenses --year 2025       # фильтр по году
 inv report-expenses --month 2025-03   # фильтр по месяцу
 inv report-expenses --csv             # CSV в stdout
-inv report-expenses --remote          # запрос к прод-БД по SSH
+inv report-expenses --prod          # запрос к прод-БД по SSH
 
-inv report-income --remote            # доходы по годам
+inv report-income --prod            # доходы по годам
 
 inv sql -q "SELECT * FROM app_metadata ORDER BY key"            # только чтение по умолчанию
 inv sql -q "DELETE FROM expenses WHERE id = 999" --write        # разрешить мутации
 inv sql -f my_query.sql --csv > out.csv
-inv sql -q "SELECT COUNT(*) FROM expenses" --remote             # снапшот прода по SSH
+inv sql -q "SELECT COUNT(*) FROM expenses" --prod             # снапшот прода по SSH
 ```
 
 ## Практические рекомендации

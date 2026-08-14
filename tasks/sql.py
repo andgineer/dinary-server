@@ -18,7 +18,7 @@ from dinary.db import storage as sqlite_types
 def _execute(sql: str, *, write: bool = False) -> tuple[list[str], list[tuple]]:
     """``write=False`` (default) opens read-only so SQLite itself refuses
     mutations; ``write=True`` is only reachable via ``inv sql --write`` locally,
-    never over ``--remote``. ``columns == []`` means no result set (DDL/pragma)."""
+    never over ``--prod``. ``columns == []`` means no result set (DDL/pragma)."""
     con = sqlite_types.connect(str(Path(settings.data_path)), read_only=not write)
     try:
         cursor = con.execute(sql)
@@ -68,7 +68,7 @@ def render_csv(columns: list[str], rows: list[tuple], *, stream: IO[str] | None 
 
 
 def render_json(columns: list[str], rows: list[tuple], *, stream: IO[str] | None = None) -> None:
-    """Schema is intentionally stable: ``inv sql --remote --json`` forwards these
+    """Schema is intentionally stable: ``inv sql --prod --json`` forwards these
     bytes verbatim, so local and remote output can be piped through ``jq`` alike."""
     out = stream if stream is not None else sys.stdout
     payload = {
@@ -81,7 +81,7 @@ def render_json(columns: list[str], rows: list[tuple], *, stream: IO[str] | None
 
 
 def rows_from_json(payload: dict) -> tuple[list[str], list[tuple]]:
-    """Reverse of ``render_json`` for the local-render path on ``--remote``."""
+    """Reverse of ``render_json`` for the local-render path on ``--prod``."""
     return payload["columns"], [tuple(r) for r in payload["rows"]]
 
 

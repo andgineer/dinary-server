@@ -6,14 +6,13 @@ import subprocess
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import datetime
 from pathlib import Path
 
 from invoke import task
 
 from dinary.db.db_migrations import migration_ids
-from tasks.backups.restore_utils import apply_restore, confirm_overwrite
-from tasks.devtools.constants import _REMOTE_DB_PATH, REMOTE_LITESTREAM_CONFIG_PATH
+from tasks.backups.restore_utils import run_restore, staged_db
+from tasks.devtools.constants import _REMOTE_DB_PATH
 from tasks.devtools.env import host
 from tasks.ssh_utils import sqlite_backup_prologue, ssh_capture, ssh_capture_bytes, ssh_run
 
@@ -62,13 +61,13 @@ def seed_categories(c):
 
 
 @task(name="verify-db")
-def verify_db(c, remote=False):  # noqa: ARG001
+def verify_db(c, prod=False):  # noqa: ARG001
     """Check DB structural integrity and foreign-key consistency.
 
-    --remote runs against a prod snapshot over SSH (default: local data/dinary.db).
+    --prod runs against a prod snapshot over SSH (default: local data/dinary.db).
     Exits non-zero on any issue.
     """
-    if remote:
+    if prod:
         remote_cmd = (
             "set -e; "
             + sqlite_backup_prologue("dinary-verify-db")
@@ -93,12 +92,12 @@ def verify_db(c, remote=False):  # noqa: ARG001
 def restore_primary(c, output=None, yes=False):  # noqa: ARG001
     """Download a live consistent snapshot from VM1 to data/dinary.db.
 
-    Uses SQLite online-backup API — no service shutdown needed.
+    Uses SQLite online-backup API — no service shutdown needed. Prod is the source
+    here, never the target, so there is no --prod: to put a snapshot back on the
+    server use restore-replica --prod or restore-yadisk --prod.
     Flags: -o PATH (default data/dinary.db), --yes to skip confirmation.
     """
     target = Path(output) if output else Path("data/dinary.db")
-    if target.exists() and target.stat().st_size > 0:
-        confirm_overwrite(target, "live snapshot from VM1", yes)
     remote_cmd = sqlite_backup_prologue("dinary-restore-primary") + 'cat "$SNAP"'
     b64 = base64.b64encode(remote_cmd.encode()).decode()
     db_bytes = subprocess.run(
@@ -106,8 +105,15 @@ def restore_primary(c, output=None, yes=False):  # noqa: ARG001
         capture_output=True,
         check=True,
     ).stdout
-    apply_restore(db_bytes, target)
-    print(f"Restored {len(db_bytes) / 1024:.1f} KB → {target}")
+    with staged_db(db_bytes) as staged:
+        run_restore(
+            c,
+            staged,
+            incoming_label="Live snapshot from VM1",
+            target=target,
+            prod=False,
+            yes=yes,
+        )
 
 
 @task(name="restore-yoyo")
@@ -145,49 +151,4 @@ def restore_yoyo(c, to):
         f" && uv run yoyo rollback --batch -r {to_roll_back[0]}"
         f" --database 'sqlite:///{_REMOTE_DB_PATH}'"
         f" src/dinary/db/migrations",
-    )
-
-
-@task(name="restore-litestream")
-def restore_litestream(c, at):
-    """Restore the server DB from the Litestream replica to a point in time.
-
-    --at accepts any ISO 8601 UTC datetime, e.g. "2026-06-22 14:30" or "2026-06-22T14:30:00Z".
-    Litestream restores to the latest WAL frame at or before that moment.
-    After restore, run inv replica-resync if replica sync is needed.
-    """
-    try:
-        ts = datetime.fromisoformat(at.rstrip("Z"))
-    except ValueError:
-        print(
-            f"Cannot parse --at={at!r} — use ISO 8601 UTC, e.g. '2026-06-22 14:30'",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    ts_rfc3339 = ts.strftime("%Y-%m-%dT%H:%M:%SZ")
-    tmp = "/tmp/dinary-litestream-restored.db"  # noqa: S108
-
-    for service in ("dinary", "litestream"):
-        svc_status = ssh_capture(c, f"systemctl is-active {service}").strip()
-        if svc_status == "active":
-            print(
-                f"{service} is running — stop both first: sudo systemctl stop dinary litestream",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    print(f"=== Restoring server DB to {ts_rfc3339} from Litestream replica ===")
-    ssh_run(
-        c,
-        f"litestream restore"
-        f" -config {REMOTE_LITESTREAM_CONFIG_PATH}"
-        f" -timestamp {ts_rfc3339}"
-        f" -o {tmp}"
-        f" {_REMOTE_DB_PATH}",
-    )
-    ssh_run(
-        c,
-        f"cp {_REMOTE_DB_PATH} {_REMOTE_DB_PATH}.before-litestream-restore"
-        f" && mv {tmp} {_REMOTE_DB_PATH}"
-        f" && rm -f {_REMOTE_DB_PATH}-wal {_REMOTE_DB_PATH}-shm",
     )

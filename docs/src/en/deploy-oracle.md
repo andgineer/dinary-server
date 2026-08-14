@@ -159,6 +159,6 @@ ssh ubuntu@<PUBLIC_IP> 'sudo iptables -I INPUT -p tcp --dport 8000 -j ACCEPT && 
 | Command | What it does |
 |---------|-------------|
 | `inv deploy --ref=main` | Checkout ref, sync deps, apply migrations, restart service |
-| `inv status --remote` | Show dinary and tunnel service status |
-| `inv logs --remote` | Tail dinary server logs |
+| `inv status --prod` | Show dinary and tunnel service status |
+| `inv logs --prod` | Tail dinary server logs |
 | `inv setup-server` | Full re-setup (safe to re-run) |

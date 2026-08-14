@@ -159,6 +159,6 @@ ssh ubuntu@<PUBLIC_IP> 'sudo iptables -I INPUT -p tcp --dport 8000 -j ACCEPT && 
 | Команда | Что делает |
 |---------|-----------|
 | `inv deploy --ref=main` | Переключиться на ref, синхронизировать зависимости, применить миграции, перезапустить |
-| `inv status --remote` | Показать статус сервисов dinary и туннеля |
-| `inv logs --remote` | Показать логи dinary в реальном времени |
+| `inv status --prod` | Показать статус сервисов dinary и туннеля |
+| `inv logs --prod` | Показать логи dinary в реальном времени |
 | `inv setup-server` | Полная настройка (безопасно запускать повторно) |

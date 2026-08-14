@@ -1,4 +1,4 @@
-"""Tests for the ``inv report-* --remote`` orchestration in :mod:`tasks.reports`.
+"""Tests for the ``inv report-* --prod`` orchestration in :mod:`tasks.reports`.
 Focuses on the JSON-on-the-wire contract so Cyrillic/box-drawing glyphs survive
 the SSH pipe intact; the local-only path is covered by manual smoke."""
 
@@ -44,7 +44,7 @@ class TestRunReportModuleRemote:
         """
         _fake_ssh_bytes.payload = b"[]\n"
         c = MagicMock()
-        tasks.reports.report_tasks._run_report_module(c, "income", [], remote=True)
+        tasks.reports.report_tasks._run_report_module(c, "income", [], prod=True)
         # The remote cmd must ask for ``--json`` so we get structured
         # data back, not a rendered rich table.
         assert "--json" in _fake_ssh_bytes.last_cmd
@@ -59,7 +59,7 @@ class TestRunReportModuleRemote:
             [{"year": 2026, "months": 3, "total": "1779756.00", "avg_month": "593252.00"}],
         ).encode()
         c = MagicMock()
-        tasks.reports.report_tasks._run_report_module(c, "income", ["--csv"], remote=True)
+        tasks.reports.report_tasks._run_report_module(c, "income", ["--csv"], prod=True)
         out = capsys.readouterr().out
         assert out.splitlines()[0] == "year,months,total,avg_month"
         assert "1779756.00" in out
@@ -77,7 +77,7 @@ class TestRunReportModuleRemote:
         payload = b'[{"year": 2025, "tags": "\xd0\xbf\xd1\x83"}]\n'
         _fake_ssh_bytes.payload = payload
         c = MagicMock()
-        tasks.reports.report_tasks._run_report_module(c, "income", ["--json"], remote=True)
+        tasks.reports.report_tasks._run_report_module(c, "income", ["--json"], prod=True)
         out = capsysbinary.readouterr().out
         assert out == payload
 
@@ -99,7 +99,7 @@ class TestRunReportModuleRemote:
             ],
         ).encode()
         c = MagicMock()
-        tasks.reports.report_tasks._run_report_module(c, "income", [], remote=True)
+        tasks.reports.report_tasks._run_report_module(c, "income", [], prod=True)
         out = capsys.readouterr().out
         # No replacement characters anywhere in the rendered output.
         assert "\ufffd" not in out
@@ -124,7 +124,7 @@ class TestRunReportModuleRemote:
             ensure_ascii=False,
         ).encode()
         c = MagicMock()
-        tasks.reports.report_tasks._run_report_module(c, "expenses", [], remote=True)
+        tasks.reports.report_tasks._run_report_module(c, "expenses", [], prod=True)
         out = capsys.readouterr().out
         assert "\ufffd" not in out
         assert "travel" in out
@@ -140,7 +140,7 @@ class TestRunReportModuleRemote:
             c,
             "expenses",
             ["--year", "2026", "--csv"],
-            remote=True,
+            prod=True,
         )
         cmd = _fake_ssh_bytes.last_cmd or ""
         # Filters go to remote (they affect the query result).

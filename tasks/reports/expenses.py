@@ -198,7 +198,7 @@ def render_csv(rows: list[ExpenseSummaryRow], *, stream: TextIO) -> None:
 
 
 def render_json(rows: Iterable[ExpenseSummaryRow], *, stream: TextIO) -> None:
-    """Wire format for ``inv report-expenses --remote`` (see
+    """Wire format for ``inv report-expenses --prod`` (see
     :func:`dinary.reports.income.render_json` for the shared Decimal/UTF-8
     rationale). ``ensure_ascii=False`` avoids a ~6x payload blow-up from
     ``\\uXXXX``-escaping the routinely non-ASCII category/event/tag text."""
@@ -284,7 +284,7 @@ def run(
         msg = (
             f"DB not found at {storage.DB_PATH}. Either point "
             "DINARY_DATA_PATH at an existing SQLite file, or use "
-            "`inv report-expenses --remote` to query the server."
+            "`inv report-expenses --prod` to query the server."
         )
         print(msg, file=sys.stderr)
         return 1
@@ -328,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help=(
             "emit a JSON array of rows to stdout (wire format used by "
-            "``inv report-expenses --remote``)"
+            "``inv report-expenses --prod``)"
         ),
     )
     args = parser.parse_args(argv)

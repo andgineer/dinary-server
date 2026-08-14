@@ -50,10 +50,10 @@ Both are read-only and cheap. `dinary` wraps them in:
 
 ```bash
 inv verify-db            # local data/dinary.db
-inv verify-db --remote   # snapshot of prod DB, checked over SSH
+inv verify-db --prod     # snapshot of prod DB, checked over SSH
 ```
 
-`--remote` first takes a `sqlite3 .backup` snapshot into `/tmp` on
+`--prod` first takes a `sqlite3 .backup` snapshot into `/tmp` on
 the server and checks that, so you never read a live file whose WAL
 is mid-checkpoint.
 
@@ -139,7 +139,7 @@ below.
 3. Confirm replication is healthy:
 
    ```bash
-   inv status --remote
+   inv status --prod
    ```
 
    A healthy sidecar shows an active systemd unit and the managed
@@ -356,6 +356,7 @@ inv restore-yadisk --list-only                     # show inventory
 inv restore-yadisk                                 # restore latest
 inv restore-yadisk --snapshot 2026-03-15           # specific date
 inv restore-yadisk --yes                           # skip confirm
+inv restore-yadisk --prod                          # restore production
 ```
 
 ### Two intended use cases
@@ -365,17 +366,15 @@ inv restore-yadisk --yes                           # skip confirm
   against real data. Low risk: any overwrite of a local debug DB
   is recoverable from the auto-saved
   `data/dinary.db.before-restore-<ts>`.
-- **Production disaster recovery.** Run the task on VM 1 itself
-  (via SSH) when both the local DB and the Litestream replica on
-  VM 2 are unusable. The SSH + `cd ~/dinary` + interactive
-  confirmation hops are intentional friction so a one-word
-  `inv restore-yadisk` on the wrong terminal cannot silently
-  overwrite prod.
+- **Production disaster recovery.** Add `--prod` and the same task
+  restores the server instead, driven entirely from the operator
+  machine.
 
-`restore-yadisk` is **local-only** — it writes to
-`./data/dinary.db` relative to the cwd and has no `--remote` mode.
-There is no way to invoke it against a remote host from the
-operator machine.
+Every restore task writes the local database unless `--prod` is
+given, so no wrong terminal or stray tab-completion can reach
+production. Restores are never launched on the server itself: the
+`--prod` path issues plain SSH commands, so a restore does not
+depend on which revision happens to be deployed there.
 
 ### Flags
 
@@ -383,7 +382,8 @@ operator machine.
 |---|---|---|
 | `--snapshot DATE` | `latest` | Filename date prefix, e.g. `2026-04-22` matches the full `dinary-2026-04-22T0317Z.db.zst` |
 | `--list-only` | off | Read-only: enumerate available snapshots and exit |
-| `--yes` | off | Skip the "type yes to proceed" gate (preservation backup still happens) |
+| `--prod` | off | Replace the production database instead of the local one |
+| `--yes` | off | Skip the "type yes to proceed" gate on a local restore. Never applies to `--prod` |
 
 ### Preconditions (one-time per machine)
 
@@ -398,40 +398,53 @@ operator machine.
 ### Safety guarantees
 
 - The snapshot is decompressed into a tmpdir and
-  `PRAGMA integrity_check`'d **before** any existing
-  `data/dinary.db` is touched. A corrupt snapshot aborts the run
-  with the live DB untouched.
-- If `data/dinary.db` exists and is non-empty, it is renamed to
-  `data/dinary.db.before-restore-<UTC-ISO>` before the move.
-  Previous state is always recoverable from the same directory,
-  even with `--yes`.
+  `PRAGMA integrity_check`'d **before** any existing database is
+  touched. A corrupt snapshot aborts the run with the live DB
+  untouched.
+- Before the confirmation prompt both databases are summarized —
+  expense count and newest expense on each side — and the prompt
+  states how many expenses the restore drops. A stale snapshot
+  shows up as a number instead of as silently missing rows later.
+- The replaced database is preserved next to the original:
+  `dinary.db.before-restore-<UTC-ISO>`, locally or on the server.
+- `--prod` asks for the literal word `prod`, and `--yes` does not
+  suppress it.
 
-### Production disaster recovery runbook
+### Production restore runbook
 
-When VM 1's live DB is gone AND the Litestream replica on VM 2 is
-unusable:
+Run from the operator machine; the source task depends on what
+survived:
 
 ```bash
-ssh ubuntu@dinary                       # or the public IP / Tailscale IP
-sudo systemctl stop dinary litestream   # avoid a half-written DB
-cd ~/dinary
-inv restore-yadisk --snapshot 2026-03-15
-# confirmation prompt: shows row count / size / mtime of the
-# current DB plus compressed size of the incoming snapshot, then
-# asks for literal 'yes'.
-sudo systemctl start litestream dinary  # resume write + replication
-inv verify-db                           # integrity + FK check
+inv restore-replica --prod                       # newest: VM2 WAL archive
+inv restore-replica --timestamp 2026-08-12T07:30:00Z --prod  # point in time
+inv restore-yadisk --snapshot 2026-03-15 --prod  # daily off-site archive
 ```
 
-If the live DB is merely stale but intact and you only want the
-Yandex snapshot for comparison, run the task in a scratch
-directory (so `./data/dinary.db` is the snapshot, not prod):
+Each of them, in one run: downloads and verifies the snapshot,
+prints both sides plus what will be lost, asks for `prod`, stops
+`dinary` and `litestream`, preserves the current database, swaps
+the file, resyncs the replica, and brings both services back —
+reporting what production ended up holding.
+
+To inspect a snapshot before committing it, restore it locally
+first (no `--prod`), look at `data/dinary.db`, then re-run with
+`--prod`.
+
+If the operator machine is unavailable, the same result without
+this repository:
 
 ```bash
-cd /tmp/restore-preview
-mkdir -p data
-inv restore-yadisk --snapshot 2026-03-15 --yes
-sqlite3 data/dinary.db 'SELECT COUNT(*) FROM expense'
+ssh ubuntu@dinary-replica \
+  'litestream restore -config /tmp/ls.yml /tmp/dinary.db'  # from VM2's tree
+scp ubuntu@dinary-replica:/tmp/dinary.db /tmp/dinary.db
+ssh ubuntu@dinary 'sudo systemctl stop dinary litestream'
+scp /tmp/dinary.db ubuntu@dinary:/home/ubuntu/dinary/data/dinary.db
+ssh ubuntu@dinary 'rm -f /home/ubuntu/dinary/data/dinary.db-wal \
+  /home/ubuntu/dinary/data/dinary.db-shm \
+  && rm -rf /home/ubuntu/dinary/data/.dinary.db-litestream'
+ssh ubuntu@dinary-replica 'rm -rf /var/lib/litestream/dinary'
+ssh ubuntu@dinary 'sudo systemctl start litestream dinary'
 ```
 
 ## Restore from cold backup
@@ -448,8 +461,8 @@ To deploy a specific version with a DB restore (e.g. rollback after a bad deploy
 
 ```bash
 inv deploy --ref=v0.4.0 --no-start   # deploy code but skip service start
-inv restore-yadisk              # restore DB from Yandex.Disk
-inv restart-server                    # start; yoyo applies forward migrations
+inv restore-yadisk --prod            # restore the server DB from Yandex.Disk
+inv restart-server                   # start; yoyo applies forward migrations
 ```
 
 ## Coordinated import reset
@@ -487,7 +500,7 @@ If `--tailscale` was passed to `inv setup-server` (rebinds sshd to Tailscale-onl
 
 ```bash
 inv healthcheck            # local data/dinary.db
-inv healthcheck --remote   # prod over SSH
+inv healthcheck --prod   # prod over SSH
 ```
 
 Checks: systemd services active, replica page count matches primary, yesterday's exchange rate
@@ -506,14 +519,14 @@ inv report-expenses                   # expenses by (category, event, tags)
 inv report-expenses --year 2025       # filter to a year
 inv report-expenses --month 2025-03   # filter to a month
 inv report-expenses --csv             # CSV to stdout
-inv report-expenses --remote          # query prod DB over SSH
+inv report-expenses --prod          # query prod DB over SSH
 
-inv report-income --remote            # income by year
+inv report-income --prod            # income by year
 
 inv sql -q "SELECT * FROM app_metadata ORDER BY key"            # read-only by default
 inv sql -q "DELETE FROM expenses WHERE id = 999" --write        # opt into mutations
 inv sql -f my_query.sql --csv > out.csv
-inv sql -q "SELECT COUNT(*) FROM expenses" --remote             # prod snapshot over SSH
+inv sql -q "SELECT COUNT(*) FROM expenses" --prod             # prod snapshot over SSH
 ```
 
 ## Practical guidance

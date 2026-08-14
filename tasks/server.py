@@ -19,9 +19,9 @@ def restart_server(c):
 
 
 @task
-def logs(c, follow=False, lines=100, remote=False):
-    """Show dinary service logs. --remote fetches from prod over SSH. -f to follow. -l N lines."""
-    if not remote:
+def logs(c, follow=False, lines=100, prod=False):
+    """Show dinary service logs. --prod fetches over SSH. -f to follow. -l N lines."""
+    if not prod:
         print("Local dev logs appear in the terminal when running `inv dev`.")
         return
     flag = "-f" if follow else f"-n {lines} --no-pager"
@@ -29,9 +29,9 @@ def logs(c, follow=False, lines=100, remote=False):
 
 
 @task
-def status(c, remote=False):
-    """Show service status and Litestream replicator state. --remote for prod over SSH."""
-    if not remote:
+def status(c, prod=False):
+    """Show service status and Litestream replicator state. --prod queries the server over SSH."""
+    if not prod:
         c.run("curl -sf http://localhost:8000/api/health || echo 'Server not responding'")
         return
     tun = tunnel()

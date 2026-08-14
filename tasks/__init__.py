@@ -22,7 +22,6 @@ from .backups.backups_status import backup_status
 from .backups.backups_yandex import setup_yadisk
 from .db import (
     migrate,
-    restore_litestream,
     restore_primary,
     restore_yoyo,
     seed_categories,
@@ -65,7 +64,6 @@ __all__ = [
     "replica_reset_trust",
     "replica_resync",
     "restore_from_yadisk",
-    "restore_litestream",
     "restore_primary",
     "restore_yoyo",
     "restore_replica",

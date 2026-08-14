@@ -1,17 +1,14 @@
-"""Yandex.Disk → laptop restore pipeline.
+"""Yandex.Disk restore pipeline.
 
-Pulls a compressed snapshot from the operator-local ``yandex:`` rclone
-remote, decompresses + integrity-checks, then atomically swaps it into
-``data/dinary.db`` and resyncs the Litestream replica so VM2's WAL
-position matches the restored DB.
+Pulls a compressed snapshot from the operator-local ``yandex:`` rclone remote,
+decompresses and integrity-checks it, then hands it to the shared restore flow —
+which writes it to the local database or, with ``--prod``, to production.
 """
 
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 
 from invoke import task
@@ -23,11 +20,10 @@ from tasks.backups.backup_snapshots import (
     parse_snapshot_lsjson,
     pick_snapshot,
     print_snapshot_list,
-    sqlite_row_count,
 )
 
 from .backups_yandex import ensure_local_yandex_rclone_configured
-from .restore_utils import litestream_active, local_replica_resync
+from .restore_utils import run_restore
 
 
 def yadisk_list_snapshots():
@@ -38,28 +34,6 @@ def yadisk_list_snapshots():
         text=True,
     )
     return parse_snapshot_lsjson(raw)
-
-
-def _prompt_restore_confirmation(target_db, picked):
-    """Requires the literal word "yes", not y/n, so ``Enter`` can't accidentally
-    commit a destructive overwrite."""
-    row_count = sqlite_row_count(target_db)
-    size_kb = target_db.stat().st_size / 1024
-    mtime = datetime.fromtimestamp(target_db.stat().st_mtime, tz=UTC).strftime(
-        "%Y-%m-%d %H:%M UTC",
-    )
-    print(
-        f"About to overwrite {target_db} ({row_count:,} expense rows, "
-        f"{size_kb:,.1f} KB, mtime {mtime})\n"
-        f"with snapshot {picked[0]} ({picked[1] / 1024:,.1f} KB compressed).\n"
-        f"The previous file will be saved as "
-        f"{target_db.name}.before-restore-<UTC-ISO>.\n"
-        f"WARNING: stop the server before proceeding to avoid WAL corruption.",
-    )
-    answer = input("Type 'yes' to proceed: ").strip()
-    if answer != "yes":
-        sys.stderr.write("Aborted.\n")
-        sys.exit(1)
 
 
 def _download_and_verify(c, picked, workpath: Path) -> Path:
@@ -87,10 +61,11 @@ def _download_and_verify(c, picked, workpath: Path) -> Path:
 
 
 @task(name="restore-yadisk")
-def restore_from_yadisk(c, snapshot="latest", list_only=False, yes=False, no_resync=False):
-    """Restore a snapshot from Yandex.Disk to data/dinary.db.
+def restore_from_yadisk(c, snapshot="latest", list_only=False, yes=False, prod=False):
+    """Restore a snapshot from Yandex.Disk.
 
-    Flags: --snapshot DATE (default latest), --list-only, --yes, --no-resync.
+    Writes data/dinary.db by default; --prod replaces the production database instead.
+    Flags: --snapshot DATE (default latest), --list-only, --yes, --prod.
     See https://andgineer.github.io/dinary/operations for restore runbooks.
     """
     assert_local_binaries(["rclone", "sqlite3", "zstd"])
@@ -113,29 +88,13 @@ def restore_from_yadisk(c, snapshot="latest", list_only=False, yes=False, no_res
         print_snapshot_list(snapshots, stream=sys.stderr)
         sys.exit(1)
 
-    target_db = Path("data/dinary.db")
-    if target_db.exists() and target_db.stat().st_size > 0 and not yes:
-        _prompt_restore_confirmation(target_db, picked)
-
     with tempfile.TemporaryDirectory() as workdir:
         restored = _download_and_verify(c, picked, Path(workdir))
-
-        target_db.parent.mkdir(parents=True, exist_ok=True)
-        if target_db.exists():
-            ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%MZ")
-            preserved = target_db.with_name(f"dinary.db.before-restore-{ts}")
-            target_db.rename(preserved)
-            print(f"Previous data/dinary.db saved as data/{preserved.name}")
-
-        for wal_file in (
-            target_db.with_suffix(".db-wal"),
-            target_db.with_suffix(".db-shm"),
-        ):
-            if wal_file.exists():
-                wal_file.unlink()
-                print(f"Removed stale WAL file {wal_file.name}")
-        shutil.move(str(restored), str(target_db))
-
-    print(f"Restored data/dinary.db from {picked[0]}")
-    if litestream_active() and not no_resync:
-        local_replica_resync(c)
+        run_restore(
+            c,
+            restored,
+            incoming_label=f"Snapshot {picked[0]}",
+            target=Path("data/dinary.db"),
+            prod=prod,
+            yes=yes,
+        )

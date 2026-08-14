@@ -23,10 +23,10 @@ from tasks.ssh_utils import (
 FALLBACK_ALERT_WINDOW = _timedelta(hours=24)
 
 
-def _healthcheck_run_queries(c, remote: bool, **queries: str) -> dict[str, str]:  # noqa: ARG001
+def _healthcheck_run_queries(c, prod: bool, **queries: str) -> dict[str, str]:  # noqa: ARG001
     names = list(queries)
     sqls = list(queries.values())
-    if remote:
+    if prod:
         combined = "; ".join(sqls)
         raw = ssh_capture_bytes(
             sqlite_backup_prologue("dinary-healthcheck") + f'sqlite3 "$SNAP" "{combined}"',
@@ -262,14 +262,14 @@ def _healthcheck_receipt_fetch(results: dict[str, str]) -> bool:
 
 
 @task(name="healthcheck")
-def healthcheck(c, remote=False):  # noqa: ARG001
+def healthcheck(c, prod=False):  # noqa: ARG001
     """Check systemd services, background tasks, and DB state.
 
-    --remote checks prod over SSH (default: local data/dinary.db).
+    --prod checks the server over SSH (default: local data/dinary.db).
     Exits non-zero on first failed check.
     See https://andgineer.github.io/dinary/operations#monitoring
     """
-    if remote:
+    if prod:
         tun = tunnel()
         services = ["dinary", "litestream"]
         if tun == "cloudflare":
@@ -295,7 +295,7 @@ def healthcheck(c, remote=False):  # noqa: ARG001
     yesterday = (_date.today() - _timedelta(days=1)).isoformat()
     results = _healthcheck_run_queries(
         c,
-        remote,
+        prod,
         rate=f"SELECT count(*) FROM exchange_rates WHERE date = '{yesterday}'",  # noqa: S608
         llm_switch=(
             "SELECT COALESCE((SELECT value FROM app_metadata"
