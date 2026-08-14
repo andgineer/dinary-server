@@ -285,3 +285,57 @@ class TestPostRestoreReport:
             yes=False,
         )
         assert "Prod now holds: 4,786 expenses" in capsys.readouterr().out
+
+
+class _TrackingConnection:
+    """Proxy: ``sqlite3.Connection.close`` is read-only, so it cannot be spied on directly."""
+
+    def __init__(self, con, closed: list[bool]) -> None:
+        self._con = con
+        self._closed = closed
+
+    def execute(self, *args, **kwargs):
+        return self._con.execute(*args, **kwargs)
+
+    def close(self) -> None:
+        self._closed.append(True)
+        self._con.close()
+
+
+@allure.epic("Infrastructure")
+@allure.feature("Backup")
+@allure.story("Restore utils")
+class TestSummaryReleasesTheFile:
+    """sqlite3's context manager ends the transaction but leaves the handle open, and on
+    Windows that blocks renaming the very file the restore is about to replace."""
+
+    @pytest.fixture
+    def _closed(self, monkeypatch):
+        closed: list[bool] = []
+        real_connect = sqlite3.connect
+        monkeypatch.setattr(
+            ru.sqlite3,
+            "connect",
+            lambda *a, **kw: _TrackingConnection(real_connect(*a, **kw), closed),
+        )
+        return closed
+
+    @pytest.fixture
+    def _db(self, tmp_path):
+        """Built before ``_closed`` patches the module-level ``sqlite3.connect``."""
+        return _make_db(tmp_path / "a.db", ["2026-08-13 03:27"])
+
+    @pytest.fixture
+    def _junk(self, tmp_path):
+        junk = tmp_path / "junk.db"
+        junk.write_bytes(b"not a database")
+        return junk
+
+    def test_connection_is_closed_after_summarizing(self, _db, _closed):
+        ru.summarize_db_file(_db, "Snapshot")
+        assert _closed, "the summary must not leave an open handle on the database"
+
+    def test_connection_is_closed_for_an_unreadable_file(self, _junk, _closed):
+        """The junk-file path returns early — it must not skip the close."""
+        ru.summarize_db_file(_junk, "Snapshot")
+        assert _closed

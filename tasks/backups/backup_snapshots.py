@@ -1,7 +1,6 @@
 import json
 import re
 import shutil
-import sqlite3
 import sys
 from datetime import UTC, datetime
 
@@ -171,17 +170,6 @@ def print_snapshot_list(snapshots, stream=None):
     for name, size in reversed(snapshots):
         kb = size / 1024
         stream.write(f"  {name}  ({kb:,.1f} KB)\n")
-
-
-def sqlite_row_count(db_path):
-    """Returns 0 on any SQLite error rather than raising — the count only feeds a
-    confirmation prompt."""
-    try:
-        with sqlite3.connect(db_path) as conn:
-            cur = conn.execute("SELECT COUNT(*) FROM expenses")
-            return cur.fetchone()[0]
-    except sqlite3.Error:
-        return 0
 
 
 def assert_local_binaries(names):

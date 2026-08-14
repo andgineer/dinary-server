@@ -67,12 +67,19 @@ def _parse_summary(raw: str, label: str) -> DbSummary:
 
 def summarize_db_file(path: Path, label: str, cutoff: str = "") -> DbSummary:
     """Summarize a local SQLite file. An unreadable file summarizes as empty — the
-    result only feeds a confirmation prompt."""
+    result only feeds a confirmation prompt.
+
+    Closed explicitly rather than through ``with``: sqlite3's context manager only ends
+    the transaction, and the leftover handle blocks the rename of the file it just read
+    on Windows.
+    """
+    con = sqlite3.connect(path)
     try:
-        with sqlite3.connect(path) as con:
-            raw = con.execute(_summary_sql(cutoff)).fetchone()[0]
+        raw = con.execute(_summary_sql(cutoff)).fetchone()[0]
     except sqlite3.Error:
         return DbSummary(label=label, rows=0)
+    finally:
+        con.close()
     return _parse_summary(str(raw), label)
 
 
