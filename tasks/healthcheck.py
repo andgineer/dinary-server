@@ -38,29 +38,55 @@ def _healthcheck_run_queries(c, prod: bool, **queries: str) -> dict[str, str]:  
     return dict(zip(names, values, strict=False))
 
 
-def _healthcheck_sheet_log(results: dict[str, str]) -> None:
+def _healthcheck_sheet_log(results: dict[str, str]) -> bool:
+    """Print the last expense's sheet-logging line. Returns True on failure."""
     expense_line = results.get("sheet", "").strip()
     if not expense_line:
         print("OK: no expenses in DB, nothing to check")
-        return
+        return False
     expense_id, job_status = (expense_line.split("|", 1) + [""])[:2]
     if job_status == "poisoned":
         print(
-            f"FAIL: last expense (id={expense_id}) sheet logging failed after all retries,"
-            " needs manual fix",
+            f"FAIL: last expense (id={expense_id}) sheet logging failed after all retries",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return True
     if job_status in ("pending", "in_progress"):
         print(f"OK: last expense (id={expense_id}) sheet logging in progress")
-    elif not job_status:
+        return False
+    if not job_status:
         print(f"OK: last expense (id={expense_id}) logged to sheet")
-    else:
-        print(
-            f"FAIL: last expense (id={expense_id}) unexpected sheet logging status: {job_status!r}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        return False
+    print(
+        f"FAIL: last expense (id={expense_id}) unexpected sheet logging status: {job_status!r}",
+        file=sys.stderr,
+    )
+    return True
+
+
+def _healthcheck_sheet_queue(results: dict[str, str]) -> bool:
+    """Print the poisoned sheet-logging backlog. Returns True if any row is poisoned.
+
+    Scoped to the whole queue, not just the newest expense: a poisoned row is terminal,
+    so checking only the tail lets the alert clear itself as soon as a later expense
+    logs successfully, leaving the stuck rows unreported forever.
+    """
+    raw = results.get("sheet_poisoned", "0|0|").strip()
+    parts = (raw.split("|") + ["0", "0", ""])[:3]
+    expenses, income, sample = int(parts[0] or 0), int(parts[1] or 0), parts[2]
+
+    if not expenses and not income:
+        print("OK: no poisoned sheet-logging jobs")
+        return False
+    detail = f"{expenses} expense job(s), {income} income job(s)"
+    if sample:
+        detail += f"; newest expense ids: {sample}"
+    print(
+        f"FAIL: poisoned sheet-logging jobs never reach the spreadsheet — {detail}."
+        " Fix with `inv requeue-sheet-jobs --prod`",
+        file=sys.stderr,
+    )
+    return True
 
 
 def _fmt_amount(value: str) -> str:
@@ -331,6 +357,15 @@ def healthcheck(c, prod=False):  # noqa: ARG001
             " COALESCE(SUM(CASE WHEN status='poisoned' THEN 1 ELSE 0 END),0)"
             " FROM receipt_classification_jobs"
         ),
+        sheet_poisoned=(
+            "SELECT (SELECT COUNT(*) FROM sheet_logging_jobs WHERE status = 'poisoned')"
+            " || '|' ||"
+            " (SELECT COUNT(*) FROM income_logging_jobs WHERE status = 'poisoned')"
+            " || '|' ||"
+            " COALESCE((SELECT GROUP_CONCAT(expense_id) FROM"
+            " (SELECT expense_id FROM sheet_logging_jobs WHERE status = 'poisoned'"
+            "  ORDER BY expense_id DESC LIMIT 5)), '')"
+        ),
         sheet=(
             "SELECT COALESCE("
             "(SELECT e.id || '|' || COALESCE(slj.status, '')"
@@ -363,12 +398,15 @@ def healthcheck(c, prod=False):  # noqa: ARG001
 
     if not _env().get("DINARY_SHEET_LOGGING_SPREADSHEET"):
         print("OK: sheet logging not configured, skipping")
+        sheet_failed = False
     else:
-        _healthcheck_sheet_log(results)
+        sheet_failed = any(
+            [_healthcheck_sheet_log(results), _healthcheck_sheet_queue(results)],
+        )
 
     _healthcheck_last_expense_info(results)
     llm_failed = _healthcheck_receipt_llm(results)
     fetch_failed = _healthcheck_receipt_fetch(results)
     queue_failed = _healthcheck_receipt_queue(results)
-    if llm_failed or fetch_failed or queue_failed:
+    if sheet_failed or llm_failed or fetch_failed or queue_failed:
         sys.exit(1)

@@ -16,6 +16,7 @@ from tasks.healthcheck import (
     _healthcheck_last_expense_info,
     _healthcheck_run_queries,
     _healthcheck_sheet_log,
+    _healthcheck_sheet_queue,
 )
 
 
@@ -23,39 +24,60 @@ from tasks.healthcheck import (
 @allure.feature("Deploy")
 class TestHealthcheckSheetLog:
     def test_logged_to_sheet(self, capsys):
-        _healthcheck_sheet_log({"sheet": "3889|"})
+        assert _healthcheck_sheet_log({"sheet": "3889|"}) is False
         assert "logged to sheet" in capsys.readouterr().out
 
     def test_pending_shows_in_progress(self, capsys):
-        _healthcheck_sheet_log({"sheet": "3889|pending"})
+        assert _healthcheck_sheet_log({"sheet": "3889|pending"}) is False
         out = capsys.readouterr().out
         assert "3889" in out
         assert "in progress" in out
 
     def test_in_progress_shows_in_progress(self, capsys):
-        _healthcheck_sheet_log({"sheet": "3889|in_progress"})
+        assert _healthcheck_sheet_log({"sheet": "3889|in_progress"}) is False
         assert "in progress" in capsys.readouterr().out
 
-    def test_poisoned_exits_1_with_manual_fix_message(self, capsys):
-        with pytest.raises(SystemExit) as excinfo:
-            _healthcheck_sheet_log({"sheet": "3889|poisoned"})
-        assert excinfo.value.code == 1
+    def test_poisoned_fails(self, capsys):
+        assert _healthcheck_sheet_log({"sheet": "3889|poisoned"}) is True
         err = capsys.readouterr().err
         assert "3889" in err
         assert "failed" in err
-        assert "manual fix" in err
 
-    def test_unexpected_status_exits_1(self, capsys):
-        with pytest.raises(SystemExit) as excinfo:
-            _healthcheck_sheet_log({"sheet": "3889|weird_status"})
-        assert excinfo.value.code == 1
+    def test_unexpected_status_fails(self, capsys):
+        assert _healthcheck_sheet_log({"sheet": "3889|weird_status"}) is True
         err = capsys.readouterr().err
         assert "unexpected" in err
         assert "weird_status" in err
 
     def test_no_expenses_in_db(self, capsys):
-        _healthcheck_sheet_log({"sheet": ""})
+        assert _healthcheck_sheet_log({"sheet": ""}) is False
         assert "no expenses" in capsys.readouterr().out
+
+
+@allure.epic("Infrastructure")
+@allure.feature("Deploy")
+class TestHealthcheckSheetQueue:
+    """The whole queue is checked, not only the newest expense: poisoned rows are
+    terminal, so a later successful expense used to silence the alert for good."""
+
+    def test_empty_queue_is_ok(self, capsys):
+        assert _healthcheck_sheet_queue({"sheet_poisoned": "0|0|"}) is False
+        assert "no poisoned" in capsys.readouterr().out
+
+    def test_poisoned_expense_jobs_fail_with_ids(self, capsys):
+        assert _healthcheck_sheet_queue({"sheet_poisoned": "37|0|4842,4781,4780"}) is True
+        err = capsys.readouterr().err
+        assert "37 expense job(s)" in err
+        assert "4842,4781,4780" in err
+        assert "inv requeue-sheet-jobs" in err
+
+    def test_poisoned_income_jobs_fail(self, capsys):
+        assert _healthcheck_sheet_queue({"sheet_poisoned": "0|2|"}) is True
+        assert "2 income job(s)" in capsys.readouterr().err
+
+    def test_missing_key_is_ok(self, capsys):
+        assert _healthcheck_sheet_queue({}) is False
+        assert "no poisoned" in capsys.readouterr().out
 
 
 @allure.epic("Infrastructure")

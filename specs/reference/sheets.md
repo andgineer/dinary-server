@@ -49,6 +49,25 @@ Each row in the logging spreadsheet covers one expense. Columns:
 
 Column B is always RSD regardless of the accounting currency, so switching `accounting_currency` does not invalidate historical sheet values.
 
+## Read quota is the drain's binding constraint
+
+The Sheets API caps read requests per minute per service account, and a single receipt
+expands into one queue row per item. The drain therefore reads the grid once per sweep and
+reuses that snapshot for every row, rather than re-reading per row: read volume scales with
+the number of sweeps, not with the number of expenses. The drain is the spreadsheet's only
+writer, so the snapshot can only go stale on a manual edit made mid-sweep.
+
+## Transient vs permanent failures
+
+A rate limit is a client error by HTTP status but self-heals with time, so it takes the
+circuit-breaker backoff path, never the poison path. This distinction matters because
+poisoning is terminal: nothing retries a poisoned row, and the expense stays out of the
+spreadsheet until an operator requeues it.
+
+Poisoned rows are therefore reported by the healthcheck as a whole-queue count. Watching
+only the newest expense would let the alert clear itself as soon as any later expense logged
+successfully, hiding the stuck rows permanently.
+
 ## Idempotency — column J
 
 The append path is at-least-once: a Sheets API call may succeed on the server even if the response is never received (network timeout). Column J holds the `client_expense_id` UUID of the most recent expense appended to that row. Before each append the drain reads J; if it already equals the incoming UUID, the write is skipped entirely.

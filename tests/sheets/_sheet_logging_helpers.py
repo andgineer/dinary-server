@@ -3,6 +3,7 @@
 import shutil
 from datetime import datetime
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -76,6 +77,19 @@ def setup(tmp_path, blank_db) -> int:
     return int(pk_row[0])
 
 
+@pytest.fixture
+def sheet_view() -> sheet_logging._SheetView:
+    """Stands in for the grid snapshot ``drain_pending`` reads once per sweep."""
+    values = [["header"], ["row1"], ["row2"], ["row3"]]
+    ws = MagicMock()
+    ws.get_all_values.return_value = values
+    return sheet_logging._SheetView(
+        ws=ws,
+        all_values=values,
+        years_by_row=[None] * len(values),
+    )
+
+
 def _expense_row(
     *,
     amount: Decimal,
@@ -97,4 +111,4 @@ def _expense_row(
     )
 
 
-__all__ = ["_expense_row", "_reset_backoff", "data_dir", "setup"]
+__all__ = ["_expense_row", "_reset_backoff", "data_dir", "setup", "sheet_view"]

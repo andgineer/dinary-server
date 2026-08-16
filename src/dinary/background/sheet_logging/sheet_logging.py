@@ -45,6 +45,9 @@ _BACKOFF_MAX_SEC = 1800.0
 
 _HTTP_CLIENT_ERROR_MIN = 400
 _HTTP_CLIENT_ERROR_MAX = 499
+_HTTP_TOO_MANY_REQUESTS = 429
+_QUOTA_STATUS = "RESOURCE_EXHAUSTED"
+_QUOTA_REASONS = frozenset({"rateLimitExceeded", "userRateLimitExceeded", "quotaExceeded"})
 
 # Wake-up channel: the lifespan drain loop registers an asyncio.Event
 # and its loop reference at startup; producers (e.g. POST /api/expenses)
@@ -104,15 +107,39 @@ class DrainResult(enum.Enum):
     POISONED = "poisoned"
 
 
+def _api_error_code(exc: gspread.exceptions.APIError) -> int:
+    code = getattr(exc, "code", None) or getattr(
+        getattr(exc, "response", None),
+        "status_code",
+        500,
+    )
+    try:
+        return int(code)
+    except (TypeError, ValueError):
+        return 500
+
+
+def _is_quota_error(exc: gspread.exceptions.APIError) -> bool:
+    """Sheets answers a rate limit with 429/``RESOURCE_EXHAUSTED``, but per-user limits
+    still arrive as a plain 403 carrying only ``reason: userRateLimitExceeded``."""
+    error = getattr(exc, "error", None)
+    if not isinstance(error, dict):
+        return False
+    if error.get("status") == _QUOTA_STATUS:
+        return True
+    details = error.get("errors")
+    if not isinstance(details, list):
+        return False
+    return any(isinstance(d, dict) and d.get("reason") in _QUOTA_REASONS for d in details)
+
+
 def _is_transient(exc: Exception) -> bool:
     """Return True for errors that should trigger the circuit breaker backoff."""
     if isinstance(exc, gspread.exceptions.APIError):
-        code = getattr(exc, "code", None) or getattr(
-            getattr(exc, "response", None),
-            "status_code",
-            500,
-        )
-        return not (_HTTP_CLIENT_ERROR_MIN <= int(code) <= _HTTP_CLIENT_ERROR_MAX)
+        code = _api_error_code(exc)
+        if code == _HTTP_TOO_MANY_REQUESTS or _is_quota_error(exc):
+            return True
+        return not (_HTTP_CLIENT_ERROR_MIN <= code <= _HTTP_CLIENT_ERROR_MAX)
     return isinstance(exc, ConnectionError | TimeoutError | OSError)
 
 
@@ -164,6 +191,27 @@ def _derive_app_currency_amount_for_sheet(
     except (ValueError, OSError):
         return None
     return float((expense.amount * rate).quantize(Decimal("0.01")))
+
+
+@dataclasses.dataclass(slots=True)
+class _SheetView:
+    """Grid snapshot shared by every row of one sweep. The drain is the sheet's only
+    writer, so the snapshot only goes stale on a manual edit mid-sweep — a window the
+    per-row re-read never closed either, since it re-read before the same append."""
+
+    ws: gspread.Worksheet
+    all_values: list[list[str]]
+    years_by_row: list[int | None]
+
+
+def _open_sheet_view(spreadsheet_id: str) -> _SheetView:
+    ws = get_sheet(spreadsheet_id).sheet1
+    all_values = ws.get_all_values()
+    return _SheetView(
+        ws=ws,
+        all_values=all_values,
+        years_by_row=fetch_row_years(ws, len(all_values)),
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -247,7 +295,7 @@ def _claim_and_resolve(
 def _drain_one_job(
     expense_pk: int,
     *,
-    spreadsheet_id: str,
+    view: _SheetView,
 ) -> DrainResult:
     """Atomically claim, append, and clear one queue row."""
     with storage.connection() as con:
@@ -283,7 +331,7 @@ def _drain_one_job(
 
         try:
             wrote_new_row = _append_row_to_sheet(
-                spreadsheet_id,
+                view,
                 _ExpenseSheetRow(
                     expense_pk=expense_pk,
                     marker_key=resolved.marker_key,
@@ -326,20 +374,18 @@ class _ExpenseSheetRow:
 
 
 def _append_row_to_sheet(
-    spreadsheet_id: str,
+    view: _SheetView,
     expense_row: "_ExpenseSheetRow",
 ) -> bool:
     """``marker_key`` is written verbatim into column J (last-key-only
     idempotency, see ``specs/reference/sheets.md``)."""
-    ss = get_sheet(spreadsheet_id)
-    ws = ss.sheet1
-    all_values = ws.get_all_values()
-    years_by_row = fetch_row_years(ws, len(all_values))
+    ws = view.ws
+    years_by_row = view.years_by_row
     target_year = expense_row.expense_date.year
 
     sheet_row, all_values = ensure_category_row(
         ws,
-        all_values,
+        view.all_values,
         expense_row.month,
         expense_row.sheet_category,
         expense_row.sheet_group,
@@ -350,6 +396,8 @@ def _append_row_to_sheet(
 
     if len(all_values) > len(years_by_row):
         years_by_row = years_by_row[: sheet_row - 1] + [target_year] + years_by_row[sheet_row - 1 :]
+    view.all_values = all_values
+    view.years_by_row = years_by_row
 
     written = append_expense_atomic(
         ws,
@@ -407,6 +455,50 @@ def _update_drain_summary(summary: dict, outcome: DrainResult) -> None:
         summary["failed"] += 1
 
 
+def _new_drain_summary() -> dict:
+    return {
+        "attempted": 0,
+        "appended": 0,
+        "already_logged": 0,
+        "failed": 0,
+        "recovered_with_duplicate": 0,
+        "noop_orphan": 0,
+        "poisoned": 0,
+        "cap_reached": False,
+    }
+
+
+def _sweep_jobs(expense_pks: list[int], view: _SheetView, summary: dict) -> bool:
+    """Drain each queue row in turn. Returns True when the sweep halted on a transient
+    failure, having already armed the backoff — the caller must not reset it."""
+    attempts = 0
+    max_attempts = settings.sheet_logging_drain_max_attempts_per_iteration
+    delay = settings.sheet_logging_drain_inter_row_delay_sec
+
+    for expense_pk in expense_pks:
+        if attempts >= max_attempts:
+            summary["cap_reached"] = True
+            return False
+        if delay > 0 and attempts > 0:
+            time.sleep(delay)
+        summary["attempted"] += 1
+        try:
+            outcome = _drain_one_job(expense_pk, view=view)
+        except Exception as exc:
+            logger.exception("Error draining expense pk=%d", expense_pk)
+            if _is_transient(exc):
+                _activate_backoff()
+                summary["failed"] += 1
+                return True
+            _poison_failing_job(expense_pk, exc)
+            summary["poisoned"] += 1
+            attempts += 1
+            continue
+        _update_drain_summary(summary, outcome)
+        attempts += 1
+    return False
+
+
 def drain_pending() -> dict:
     """Drain ``sheet_logging_jobs`` from the single ``dinary.db``."""
     spreadsheet_id = get_logging_spreadsheet_id()
@@ -417,16 +509,7 @@ def drain_pending() -> dict:
     if _backoff_until is not None and now < _backoff_until:
         return {"backoff_active": True}
 
-    summary: dict = {
-        "attempted": 0,
-        "appended": 0,
-        "already_logged": 0,
-        "failed": 0,
-        "recovered_with_duplicate": 0,
-        "noop_orphan": 0,
-        "poisoned": 0,
-    }
-
+    summary = _new_drain_summary()
     with storage.connection() as con:
         expense_pks = list_logging_jobs(con)
 
@@ -438,36 +521,16 @@ def drain_pending() -> dict:
     # only reparses the map tab when it actually changed.
     sheet_mapping.ensure_fresh()
 
-    attempts = 0
-    cap_reached = False
-    max_attempts = settings.sheet_logging_drain_max_attempts_per_iteration
-    delay = settings.sheet_logging_drain_inter_row_delay_sec
+    try:
+        view = _open_sheet_view(spreadsheet_id)
+    except Exception as exc:
+        logger.exception("Failed to open the logging sheet; skipping sweep")
+        if _is_transient(exc):
+            _activate_backoff()
+        summary["failed"] += 1
+        return summary
 
-    for expense_pk in expense_pks:
-        if attempts >= max_attempts:
-            cap_reached = True
-            break
-        if delay > 0 and attempts > 0:
-            time.sleep(delay)
-        summary["attempted"] += 1
-        try:
-            outcome = _drain_one_job(expense_pk, spreadsheet_id=spreadsheet_id)
-        except Exception as exc:
-            logger.exception("Error draining expense pk=%d", expense_pk)
-            if _is_transient(exc):
-                _activate_backoff()
-                summary["failed"] += 1
-                summary["cap_reached"] = cap_reached
-                return summary
-            _poison_failing_job(expense_pk, exc)
-            summary["poisoned"] += 1
-            attempts += 1
-            continue
-        _update_drain_summary(summary, outcome)
-        attempts += 1
-
-    if not cap_reached:
+    halted = _sweep_jobs(expense_pks, view, summary)
+    if not halted and not summary["cap_reached"]:
         _reset_backoff()
-
-    summary["cap_reached"] = cap_reached
     return summary

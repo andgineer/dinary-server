@@ -504,7 +504,16 @@ inv healthcheck --prod   # prod over SSH
 ```
 
 Checks: systemd services active, replica page count matches primary, yesterday's exchange rate
-cached, last expense logged to Google Sheets. Exits non-zero on first failure.
+cached, last expense logged to Google Sheets, no poisoned sheet-logging jobs. Exits non-zero
+when any check fails.
+
+A poisoned sheet-logging job is terminal — the expense never reaches the spreadsheet until
+the row is put back in the queue:
+
+```bash
+inv requeue-sheet-jobs --prod   # poisoned -> pending, the drain retries on its next sweep
+inv requeue-sheet-jobs          # same against local data/dinary.db
+```
 
 ```bash
 inv backup-cloud-status                    # newest Yandex.Disk snapshot age (exits non-zero if stale)

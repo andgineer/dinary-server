@@ -2,7 +2,7 @@
 (``test_sheet_logging_derive.py``), drain happy-path (``test_sheet_logging_drain.py``),
 and idempotency/circuit-breaker (``test_sheet_logging.py``)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import allure
 import pytest
@@ -15,6 +15,7 @@ from _sheet_logging_helpers import (  # noqa: F401  (autouse + fixtures)
     _reset_backoff,
     data_dir,
     setup,
+    sheet_view,
 )
 
 
@@ -22,7 +23,6 @@ from _sheet_logging_helpers import (  # noqa: F401  (autouse + fixtures)
 @allure.feature("Sheet logging")
 @allure.story("Drain one job")
 class TestDrainOneJobReturnContract:
-    @patch("dinary.background.sheet_logging.sheet_logging.get_sheet")
     @patch("dinary.background.sheet_logging.sheet_logging.get_rate", return_value="117.0")
     @patch("dinary.background.sheet_logging.sheet_logging.ensure_category_row")
     @patch(
@@ -34,25 +34,17 @@ class TestDrainOneJobReturnContract:
         _aea,
         mock_ecr,
         _gr,
-        mock_sheet,
         setup,
+        sheet_view,
     ):
         """``_drain_one_job`` re-raises on append failure so
         ``drain_pending`` can classify the error as transient/permanent.
         The claim must be released so the next sweep can retry."""
-        ws = MagicMock()
-        values = [["header"], ["row1"], ["row2"], ["row3"]]
-        ws.get_all_values.return_value = values
-        mock_sheet.return_value.worksheet.return_value = ws
-        mock_sheet.return_value.sheet1 = ws
-        mock_ecr.return_value = (3, values)
+        mock_ecr.return_value = (3, sheet_view.all_values)
 
         expense_pk = setup
         with pytest.raises(RuntimeError, match="simulated sheet failure"):
-            sheet_logging._drain_one_job(
-                expense_pk,
-                spreadsheet_id="test-spreadsheet-id",
-            )
+            sheet_logging._drain_one_job(expense_pk, view=sheet_view)
 
         # Queue row remains ``pending`` (claim released) so the next
         # sweep retries.
@@ -71,7 +63,6 @@ class TestDrainOneJobClaimStolen:
     queue row and surface ``RECOVERED_WITH_DUPLICATE`` (distinct from ``FAILED``,
     so the sweep summary distinguishes "audit the sheet" from "retry pending")."""
 
-    @patch("dinary.background.sheet_logging.sheet_logging.get_sheet")
     @patch("dinary.background.sheet_logging.sheet_logging.get_rate", return_value="117.0")
     @patch("dinary.background.sheet_logging.sheet_logging.ensure_category_row")
     @patch("dinary.background.sheet_logging.sheet_logging.append_expense_atomic", return_value=True)
@@ -80,24 +71,16 @@ class TestDrainOneJobClaimStolen:
         _aea,
         mock_ecr,
         _gr,
-        mock_sheet,
         setup,
+        sheet_view,
     ):
-        ws = MagicMock()
-        values = [["header"], ["row1"], ["row2"], ["row3"]]
-        ws.get_all_values.return_value = values
-        mock_sheet.return_value.worksheet.return_value = ws
-        mock_sheet.return_value.sheet1 = ws
-        mock_ecr.return_value = (3, values)
+        mock_ecr.return_value = (3, sheet_view.all_values)
 
         expense_pk = setup
         with patch(
             "dinary.background.sheet_logging.sheet_logging.clear_logging_job", return_value=False
         ):
-            result = sheet_logging._drain_one_job(
-                expense_pk,
-                spreadsheet_id="test-spreadsheet-id",
-            )
+            result = sheet_logging._drain_one_job(expense_pk, view=sheet_view)
 
         assert result is sheet_logging.DrainResult.RECOVERED_WITH_DUPLICATE
         con = storage.get_connection()
@@ -106,7 +89,6 @@ class TestDrainOneJobClaimStolen:
         finally:
             con.close()
 
-    @patch("dinary.background.sheet_logging.sheet_logging.get_sheet")
     @patch("dinary.background.sheet_logging.sheet_logging.get_rate", return_value="117.0")
     @patch("dinary.background.sheet_logging.sheet_logging.ensure_category_row")
     @patch("dinary.background.sheet_logging.sheet_logging.append_expense_atomic", return_value=True)
@@ -115,18 +97,13 @@ class TestDrainOneJobClaimStolen:
         _aea,
         mock_ecr,
         _gr,
-        mock_sheet,
         setup,
+        sheet_view,
     ):
         """Even if the row was operator-wiped (not stolen), still surfaces
         ``RECOVERED_WITH_DUPLICATE`` — over-warning is safer than silently
         leaking a duplicate."""
-        ws = MagicMock()
-        values = [["header"], ["row1"], ["row2"], ["row3"]]
-        ws.get_all_values.return_value = values
-        mock_sheet.return_value.worksheet.return_value = ws
-        mock_sheet.return_value.sheet1 = ws
-        mock_ecr.return_value = (3, values)
+        mock_ecr.return_value = (3, sheet_view.all_values)
 
         expense_pk = setup
         with (
@@ -139,9 +116,6 @@ class TestDrainOneJobClaimStolen:
                 return_value=False,
             ),
         ):
-            result = sheet_logging._drain_one_job(
-                expense_pk,
-                spreadsheet_id="test-spreadsheet-id",
-            )
+            result = sheet_logging._drain_one_job(expense_pk, view=sheet_view)
 
         assert result is sheet_logging.DrainResult.RECOVERED_WITH_DUPLICATE

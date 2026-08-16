@@ -37,6 +37,7 @@ from .receipt import classify_receipt, reclassify_receipts
 from .reports.report_tasks import report_expenses, report_income, sql_query
 from .server import logs, restart_server, ssh, ssh_replica, status
 from .setup import setup_server
+from .sheet_jobs import requeue_sheet_jobs
 
 __all__ = [
     "analytics",
@@ -58,6 +59,7 @@ __all__ = [
     "migrate",
     "pre",
     "reqs",
+    "requeue_sheet_jobs",
     "report_expenses",
     "report_income",
     "restart_server",
