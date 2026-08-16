@@ -2,7 +2,7 @@
 [![Coverage](https://raw.githubusercontent.com/andgineer/dinary/python-coverage-comment-action-data/badge.svg)](https://htmlpreview.github.io/?https://github.com/andgineer/dinary/blob/python-coverage-comment-action-data/htmlcov/index.html)
 # Dinary - Your Dinar Diary
 
-Track expenses, scan receipts, analyze spending with AI
+Track expenses, scan receipts (Serbia, Montenegro), analyze spending with AI
 
 <table>
 <tr>

@@ -1,6 +1,6 @@
 # Dinary
 
-Track expenses, scan receipts, analyze spending with AI.
+Track expenses, scan receipts (Serbia, Montenegro), analyze spending with AI.
 
 Dinary server is a FastAPI backend that:
 
