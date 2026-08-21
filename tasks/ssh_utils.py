@@ -273,9 +273,10 @@ def build_harden_sshd_script():
 
 
 def build_install_fail2ban_script():
-    """Ban policy: 3 failures/10min, 1-day initial ban, geometric increase capped
-    at 30d. ``ignoreip`` includes the Tailscale CGNAT range so admins on a
-    Tailscale IP never get banned."""
+    """``ignoreip`` exempts the tailnet, but no current path arrives that way:
+    deploy and replication reach both VMs by public IP. A key-only client still
+    cannot trip the jail — the sshd filter's default ``normal`` mode ignores the
+    preauth-close line a rejected key produces."""
     return (
         "sudo bash <<'DINARY_F2B_EOF'\n"
         "set -euo pipefail\n"

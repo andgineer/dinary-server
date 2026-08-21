@@ -291,8 +291,7 @@ class TestHardenSshdScript:
 @allure.feature("Deploy")
 @allure.story("Server setup")
 class TestInstallFail2banScript:
-    """Losing any of these knobs disables the jail, unbans too fast, or — most
-    critically — drops the ``ignoreip`` exclusion and bans operators on the tailnet."""
+    """Losing any of these knobs disables the jail or unbans too fast."""
 
     def test_installs_fail2ban_via_apt_noninteractive(self):
         script = tasks.ssh_utils.build_install_fail2ban_script()
@@ -306,8 +305,8 @@ class TestInstallFail2banScript:
         assert "backend = systemd" in script
 
     def test_ignoreip_whitelists_tailscale_cgnat(self):
-        """Without this, a mistyped password over the tailnet bans the operator
-        on the only tunnel into the box."""
+        """Exempts admin sessions that do arrive over the tailnet; the deploy and
+        replication paths use public IPs and are not exempt."""
         script = tasks.ssh_utils.build_install_fail2ban_script()
         assert "100.64.0.0/10" in script
         assert "ignoreip" in script
