@@ -1,0 +1,2 @@
+=== Restoring from ubuntu@test-replica LTX archive ===
+=== Restored 0.1 KB → data/dinary.db ===

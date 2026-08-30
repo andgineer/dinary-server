@@ -1,0 +1,1463 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Andrey Sorokin">
+      
+      
+        <link rel="canonical" href="https://andgineer.github.io/dinary/operations/">
+      
+      
+        <link rel="prev" href="../cloudflare-setup/">
+      
+      
+        <link rel="next" href="../development/">
+      
+      
+        
+          <link rel="alternate" href="/dinary/" hreflang="en">
+        
+          <link rel="alternate" href="/dinary/ru/" hreflang="ru">
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.45">
+    
+    
+      
+        <title>Database, Migrations, Backups, and Replication - dinary</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#database-migrations-backups-and-replication" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="dinary" class="md-header__button md-logo" aria-label="dinary" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            dinary
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Database, Migrations, Backups, and Replication
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-languages" viewBox="0 0 24 24"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="/dinary/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="/dinary/ru/" hreflang="ru" class="md-select__link">
+              Русский
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/andgineer/dinary" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dinary
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="dinary" class="md-nav__button md-logo" aria-label="dinary" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    dinary
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/andgineer/dinary" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dinary
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dinary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Your Personal Financial Analyst
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../google-sheets-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Google Sheets Setup
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pwa-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installing the PWA
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy-oracle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy on Oracle Cloud Free Tier
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy-selfhost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy on Your Own Computer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloudflare-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Cloudflare Tunnel &amp; Access Setup
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Database, Migrations, Backups, and Replication
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Database, Migrations, Backups, and Replication
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#database-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Database file
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Migrations
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Migrations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-migrations-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When migrations run
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integrity-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Integrity check
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backups" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Backups
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backups">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pre-deploy-snapshot-automatic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pre-deploy snapshot (automatic)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hot-replica-litestream" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Hot replica: Litestream
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Hot replica: Litestream">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Prerequisites
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provisioning-vm-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Provisioning VM 2
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-time-litestream-bootstrap-on-vm-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        One-time Litestream bootstrap on VM 1
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-sidecar-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What the sidecar does
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#restoring-from-a-replica" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Restoring from a replica
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#off-site-backup-yandexdisk-daily-gfs-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Off-site backup: Yandex.Disk (daily, GFS retention)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Off-site backup: Yandex.Disk (daily, GFS retention)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What it does
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gfs-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        GFS retention
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#one-time-bootstrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        One-time bootstrap
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#watching-the-daily-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Watching the daily run
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#freshness-monitoring-inv-backup-cloud-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Freshness monitoring: <code>inv backup-cloud-status</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-yandexdisk-access-inv-setup-yadisk" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Local Yandex.Disk access: <code>inv setup-yadisk</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#point-in-time-restore-from-yandexdisk" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Point-in-time restore from Yandex.Disk
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Point-in-time restore from Yandex.Disk">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-intended-use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Two intended use cases
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Flags
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#preconditions-one-time-per-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Preconditions (one-time per machine)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Safety guarantees
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-restore-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Production restore runbook
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#restore-from-cold-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Restore from cold backup
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploy-restore-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deploy + restore flow
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#coordinated-import-reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Coordinated import reset
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vm2-host-key-refresh" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        VM2 host-key refresh
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tailscale-sshd-break-glass" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tailscale sshd break-glass
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Monitoring
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reporting-and-data-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Reporting and data access
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#practical-guidance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Practical guidance
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Development
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="database-migrations-backups-and-replication">Database, Migrations, Backups, and Replication</h1>
+<p>This page describes how <code>dinary</code> stores data, how schema migrations
+run, the full backup story (local cold copies, hot Litestream
+replication to VM 2, and daily off-site backups to Yandex.Disk), and
+the restore procedures for each.</p>
+<h2 id="database-file">Database file</h2>
+<p>The server stores everything in a single SQLite database:</p>
+<ul>
+<li><code>data/dinary.db</code> — the live database (categories, groups, tags,
+  stores, mappings, expenses, income, and sync-job metadata)</li>
+<li><code>data/dinary.db-wal</code> and <code>data/dinary.db-shm</code> — SQLite WAL-mode
+  sidecars that hold in-flight writes before they are checkpointed
+  back into <code>dinary.db</code></li>
+</ul>
+<p>All three files belong together. Do not copy just <code>dinary.db</code>: the
+WAL sidecar can legitimately contain committed transactions that
+have not yet been checkpointed. Any backup flow that does not go
+through SQLite's <code>.backup</code> API must stop the <code>dinary</code> service first.</p>
+<h2 id="migrations">Migrations</h2>
+<p>Schema changes are managed with <code>yoyo</code> migrations living in
+<code>src/dinary/migrations/</code>.</p>
+<h3 id="when-migrations-run">When migrations run</h3>
+<p>Migrations run automatically on every server start — yoyo applies any
+outstanding migration before the first request is served. No manual
+step is needed: <code>inv deploy --ref=&lt;version&gt;</code> restarts the service, and
+yoyo handles the rest.</p>
+<p>For development, <code>inv dev</code> triggers the same path on startup.
+Use <code>inv migrate</code> to apply migrations without restarting the server.</p>
+<h2 id="integrity-check">Integrity check</h2>
+<p>SQLite ships two pragmas for post-migration / post-restore sanity
+checks:</p>
+<ul>
+<li><code>PRAGMA integrity_check</code> walks every btree page and reports
+  structural damage (torn pages, index/table mismatches, orphan
+  freelist entries).</li>
+<li><code>PRAGMA foreign_key_check</code> lists every row that violates a
+  declared FK.</li>
+</ul>
+<p>Both are read-only and cheap. <code>dinary</code> wraps them in:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>verify-db<span class="w">            </span><span class="c1"># local data/dinary.db</span>
+inv<span class="w"> </span>verify-db<span class="w"> </span>--prod<span class="w">     </span><span class="c1"># snapshot of prod DB, checked over SSH</span>
+</code></pre></div>
+<p><code>--prod</code> first takes a <code>sqlite3 .backup</code> snapshot into <code>/tmp</code> on
+the server and checks that, so you never read a live file whose WAL
+is mid-checkpoint.</p>
+<h2 id="backups">Backups</h2>
+<p><code>dinary</code> uses three backup layers paired to their failure modes.</p>
+<h3 id="pre-deploy-snapshot-automatic">Pre-deploy snapshot (automatic)</h3>
+<p><code>inv deploy</code> always takes a <code>sqlite3 .backup</code> snapshot before touching
+the server and writes it to <code>data/backups/pre-deploy-&lt;timestamp&gt;/dinary.db</code>
+on your workstation. No manual step needed.</p>
+<p>To pull a live snapshot manually for local debugging:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>restore-primary<span class="w">          </span><span class="c1"># download prod DB to data/dinary.db</span>
+</code></pre></div>
+<h3 id="hot-replica-litestream">Hot replica: Litestream</h3>
+<p><code>inv backup</code> is pull-based and fires on demand. For continuous
+streaming replication — "my VM 1 got terminated; how much data did
+I just lose" — <code>dinary</code> supports Litestream (v0.5.x) as a sidecar
+that ships LTX segments to an SFTP target continuously.</p>
+<h4 id="prerequisites">Prerequisites</h4>
+<ul>
+<li>A second VM you control (VM 2, the Litestream replica host) — the
+  reference target is an Oracle Cloud Free Tier <code>VM.Standard.E2.1.
+  Micro</code> with Ubuntu 22.04 Minimal, same shape as VM 1.</li>
+<li>VM 2 has <code>DINARY_REPLICA_HOST</code> set in <code>.deploy/.env</code> on the
+  operator machine (e.g. <code>ubuntu@dinary-replica</code> via Tailscale
+  MagicDNS).</li>
+<li>VM 1's <code>~/.ssh/id_ed25519.pub</code> is in VM 2's
+  <code>~/.ssh/authorized_keys</code> — this is the trust that lets
+  <code>litestream.service</code> on VM 1 push WAL segments over SFTP. Run
+  <code>ssh-copy-id</code> manually once (cross-host trust is out of scope for
+  automation from the operator machine).</li>
+</ul>
+<h4 id="provisioning-vm-2">Provisioning VM 2</h4>
+<p>Run once from the operator machine against VM 2:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>setup-replica
+</code></pre></div>
+<p>This installs <code>unattended-upgrades</code>, allocates a 1 GB swap file,
+creates <code>/var/lib/litestream/</code> with the right ownership so the SFTP
+receiver can drop WAL segments into it, and locks public SSH. The task is idempotent — re-running it after a
+<code>Persistent=true</code> reboot or a Tailscale IP rotation converges
+cleanly.</p>
+<p><code>setup-replica</code> does NOT install the <code>dinary</code> app service, a public
+tunnel, or any Python runtime — VM 2 is intentionally a minimal SFTP
+sink. Everything the daily off-site backup needs (rclone, sqlite3,
+zstd, the Litestream binary used only for local restore) is added
+by <code>inv setup-replica</code> — see "Off-site backup: Yandex.Disk"
+below.</p>
+<h4 id="one-time-litestream-bootstrap-on-vm-1">One-time Litestream bootstrap on VM 1</h4>
+<ol>
+<li>Copy the example config locally and fill in the SFTP target:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>.deploy.example/litestream.yml<span class="w"> </span>.deploy/litestream.yml
+<span class="c1"># edit .deploy/litestream.yml — set host, user, path, key-path</span>
+</code></pre></div>
+<ol>
+<li>Install the Litestream sidecar on VM 1 (now part of <code>inv setup-replica</code>):</li>
+</ol>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>setup-replica
+</code></pre></div>
+<p>This installs the Litestream binary, uploads the config to
+   <code>/etc/litestream.yml</code>, creates a <code>litestream.service</code> systemd
+   unit, and starts it. The task is idempotent — re-running
+   <code>inv setup-replica</code> upgrades the binary and reloads the
+   config.</p>
+<ol>
+<li>Confirm replication is healthy:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>status<span class="w"> </span>--prod
+</code></pre></div>
+<p>A healthy sidecar shows an active systemd unit and the managed
+   DB path listed by <code>litestream databases</code>. An empty output means
+   the sidecar either never reached the SFTP host or is still
+   producing its first snapshot (first one lands within seconds of
+   the first DB write after the sidecar starts).</p>
+<p><code>inv setup-server</code> does not start Litestream automatically even when
+<code>.deploy/litestream.yml</code> is present, because the sidecar needs an
+already-reachable SFTP host with VM 1's public key in its
+<code>authorized_keys</code> — a cross-host trust relationship we cannot set
+up from the deploy workstation. Run <code>inv setup-replica</code>
+manually once that prerequisite is in place.</p>
+<h4 id="what-the-sidecar-does">What the sidecar does</h4>
+<p>Litestream v0.5 is a passive replicator: it opens the DB
+read-only, tails LTX segments out of SQLite's WAL, compacts them
+into level files, and ships them to the SFTP target. The app never
+talks to it. If the sidecar crashes, the app keeps writing into the
+WAL normally — you just stop accumulating replica state until the
+sidecar restarts. There is no back-pressure; SQLite's checkpoint
+loop is unaffected.</p>
+<p>Default settings in the example config: a full snapshot every hour
+and 7 days of LTX history (top-level <code>snapshot: { interval: 1h,
+retention: 168h }</code>). That bounds "how far back can I rewind the DB"
+to a week and bounds LTX replay on restore to a one-hour window.
+These fields are global in v0.5 — they are NOT valid inside a
+per-replica block and Litestream refuses to start if they are
+placed there.</p>
+<h4 id="restoring-from-a-replica">Restoring from a replica</h4>
+<p>On any host with Litestream installed and SSH access to the replica
+target:</p>
+<div class="highlight"><pre><span></span><code>litestream<span class="w"> </span>restore<span class="w"> </span>-config<span class="w"> </span>/path/to/litestream.yml<span class="w"> </span>/path/to/output/dinary.db
+</code></pre></div>
+<p>Litestream reads the most recent snapshot in the replica, replays
+LTX forward to the latest committed transaction, and writes a fresh
+<code>dinary.db</code>. The restored DB is transactionally consistent — no
+<code>PRAGMA integrity_check</code> is required, but running it does not hurt.</p>
+<h2 id="off-site-backup-yandexdisk-daily-gfs-retention">Off-site backup: Yandex.Disk (daily, GFS retention)</h2>
+<p>The Litestream replica on VM 2 is hot (seconds-level RPO) but
+co-located with VM 1 in the same cloud provider's region. For
+"both VMs went away" scenarios there is a daily off-site backup
+pushed from VM 2 to Yandex.Disk, orchestrated by
+<code>inv setup-replica</code>.</p>
+<h3 id="what-it-does">What it does</h3>
+<p>Every day at 03:17 UTC (+ 30 min jitter) a systemd oneshot on VM 2:</p>
+<ol>
+<li>Materializes the local Litestream replica at
+   <code>/var/lib/litestream/dinary</code> into a plain SQLite file via
+   <code>litestream restore</code>.</li>
+<li>Validates the restored file with <code>PRAGMA integrity_check</code>.
+   A corruption failure aborts the run without uploading — we
+   refuse to overwrite the Yandex history with a visibly broken
+   snapshot.</li>
+<li>Compresses with <code>zstd -19</code> (ratio is near-optimal on SQLite's
+   repetitive page layout; CPU cost is negligible on the &lt;1 MB
+   input).</li>
+<li>Uploads to
+   <code>yandex:Backup/dinary/dinary-&lt;UTC-ISO&gt;.db.zst</code> via <code>rclone</code>.</li>
+<li>Prunes Yandex.Disk per the GFS retention policy (see below).</li>
+</ol>
+<p>The upload is a plain compressed SQLite file, not an opaque
+repository format — any machine with <code>zstd</code> and <code>sqlite3</code> can open
+a snapshot directly without the <code>dinary</code> tooling.</p>
+<h3 id="gfs-retention">GFS retention</h3>
+<ul>
+<li>7 most-recent <strong>daily</strong> snapshots.</li>
+<li>4 most-recent <strong>weekly</strong> snapshots (newest per ISO week).</li>
+<li>12 most-recent <strong>monthly</strong> snapshots (newest per calendar month).</li>
+<li>All <strong>yearly</strong> snapshots, kept indefinitely (closed years are
+  immutable — any drift between two yearly snapshots of the same
+  closed year signals corruption and is worth keeping forever).</li>
+</ul>
+<p>Buckets overlap — a snapshot is pruned only if it belongs to no
+keeper bucket. On a 10-year horizon this is roughly 29 files total
+(~9 MB on disk).</p>
+<h3 id="one-time-bootstrap">One-time bootstrap</h3>
+<p>Run once from the operator machine against VM 2 (this also covers the off-site backup bootstrap):</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>setup-replica
+</code></pre></div>
+<p>The task:</p>
+<ul>
+<li>Installs apt packages <code>rclone</code>, <code>sqlite3</code>, <code>zstd</code> and the pinned
+  Litestream binary on VM 2.</li>
+<li><strong>Configures the <code>yandex:</code> rclone remote interactively on the
+  first run.</strong> If the remote is missing the task prints a pointer
+  to <a href="https://id.yandex.ru/security/app-passwords">https://id.yandex.ru/security/app-passwords</a>, prompts for the
+  Yandex login, and reads the app-password via <code>getpass</code> (no echo).</li>
+</ul>
+<blockquote>
+<p><strong>Yandex WebDAV does NOT accept your regular Yandex account
+password.</strong> You must create a dedicated app-password under the
+"Files" (Файлы / WebDAV) category on the page above — Mail,
+Calendar, or generic tokens are rejected by the WebDAV
+endpoint. The app-password is revocable from the same page
+without affecting the main account password.</p>
+</blockquote>
+<p>The plaintext password travels only over the SSH channel to VM 2,
+  is fed to <code>rclone obscure -</code> on stdin, and only the obscured form
+  is written to <code>~ubuntu/.config/rclone/rclone.conf</code>. Plaintext
+  never lands in argv (<code>ps</code> listing), shell history, or disk.</p>
+<p>After writing the config the task runs <code>rclone lsd yandex:</code> as a
+  smoke test. Any failure (wrong password, wrong scope, network)
+  aborts the task and rolls back the partial config so the next run
+  re-prompts with a clean slate. On a green smoke test the prompt
+  is skipped on subsequent runs.
+- Writes <code>/usr/local/bin/dinary-backup</code> and the paired retention
+  script; installs and enables <code>dinary-backup.timer</code>; triggers one
+  immediate run so the first snapshot is visible on Yandex.Disk
+  within a minute of bootstrap.</p>
+<p>Why an app-password and not the full OAuth flow: VM 2 is headless,
+and the interactive <code>rclone config</code> wizard expects a
+laptop-authorize → copy-token dance across machines. An
+app-password is equivalent for our access pattern (PUT/DELETE of
+uploaded files), can be revoked from the Yandex account UI at any
+time, and bootstrap stays end-to-end non-interactive beyond the
+password prompt.</p>
+<p>The task is idempotent: apt installs are no-op on re-apply,
+rclone-remote bootstrap is a no-op once <code>yandex:</code> exists, scripts
+and systemd units are overwritten, <code>enable --now</code> is harmless to
+re-run.</p>
+<h3 id="watching-the-daily-run">Watching the daily run</h3>
+<div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>ubuntu@dinary-replica<span class="w"> </span>sudo<span class="w"> </span>journalctl<span class="w"> </span>-u<span class="w"> </span>dinary-backup.service<span class="w"> </span>-n<span class="w"> </span><span class="m">50</span><span class="w"> </span>--no-pager
+ssh<span class="w"> </span>ubuntu@dinary-replica<span class="w"> </span>sudo<span class="w"> </span>systemctl<span class="w"> </span>list-timers<span class="w"> </span>dinary-backup.timer
+</code></pre></div>
+<h3 id="freshness-monitoring-inv-backup-cloud-status">Freshness monitoring: <code>inv backup-cloud-status</code></h3>
+<p>The daily timer failing silently is the worst-case mode — the
+off-site snapshot stops refreshing while everything else looks fine.
+<code>inv backup-cloud-status</code> is the off-VM2 probe:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>backup-cloud-status<span class="w">                     </span><span class="c1"># human one-liner; exit 0/1</span>
+inv<span class="w"> </span>backup-cloud-status<span class="w"> </span>--json-output<span class="w">       </span><span class="c1"># machine-readable verdict</span>
+inv<span class="w"> </span>backup-cloud-status<span class="w"> </span>--max-age-hours<span class="w"> </span><span class="m">3</span><span class="w">   </span><span class="c1"># tighten threshold during an incident</span>
+</code></pre></div>
+<p>It SSHes into VM 2, runs <code>rclone lsjson</code> against the <code>yandex:</code>
+remote, extracts the UTC timestamp encoded in the newest
+<code>dinary-YYYY-MM-DDTHHMMZ.db.zst</code> filename, and compares it to
+<code>--max-age-hours</code> (default <strong>26 h</strong> — 24 h + 1 h for the 30 min
+timer jitter + 30 min headroom). Sample outputs:</p>
+<div class="highlight"><pre><span></span><code>OK: newest dinary-2026-04-22T0317Z.db.zst, age 7.1h, size 198.5 KB (threshold: 26h)
+STALE: newest dinary-2026-04-20T0317Z.db.zst, age 49.3h, size 198.1 KB (threshold: 26h)
+STALE: no snapshots on yandex:Backup/dinary/ (threshold: 26h)
+</code></pre></div>
+<p>Because it runs off-VM2, <strong>both</strong> a dead VM 2 (SSH fails) and a
+silently-stopped timer (snapshot stale) surface as a non-zero exit
+code, so one probe covers both failure modes.</p>
+<p>Wire it into laptop cron via
+<code>linux-conf/osx/dinary_backup_check.sh</code> (copied into <code>~/scripts/</code>
+by <code>linux-conf/osx/copy_scripts.sh</code>). That wrapper <code>cd</code>s into
+<code>~/projects/dinary</code>, runs <code>uv run inv backup-cloud-status</code>, and on
+non-zero exit pipes the captured output through <code>send_fail_email</code>
+(macOS-side msmtp → Yandex SMTP). Suggested crontab:</p>
+<div class="highlight"><pre><span></span><code>17 */6 * * * /Users/&lt;you&gt;/scripts/dinary_backup_check.sh
+</code></pre></div>
+<p>Four checks per day is cheap and catches a missed 03:17 UTC run
+within hours rather than the next morning.</p>
+<h3 id="local-yandexdisk-access-inv-setup-yadisk">Local Yandex.Disk access: <code>inv setup-yadisk</code></h3>
+<p><code>restore-yadisk</code> reads from <code>yandex:</code> on whichever machine it
+runs. <code>inv setup-yadisk</code> configures that remote locally — on VM 1
+during disaster recovery, or on the operator laptop for debug
+bootstraps:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>setup-yadisk
+</code></pre></div>
+<p>Uses the same WebDAV + app-password flow as <code>inv setup-replica</code> (no
+browser OAuth needed). Idempotent: skips the prompt if <code>yandex:</code> is
+already configured and healthy.</p>
+<p><code>restore-yadisk</code> calls this automatically when <code>yandex:</code> is
+absent, so running it beforehand is optional.</p>
+<h2 id="point-in-time-restore-from-yandexdisk">Point-in-time restore from Yandex.Disk</h2>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>restore-yadisk<span class="w"> </span>--list-only<span class="w">                     </span><span class="c1"># show inventory</span>
+inv<span class="w"> </span>restore-yadisk<span class="w">                                 </span><span class="c1"># restore latest</span>
+inv<span class="w"> </span>restore-yadisk<span class="w"> </span>--snapshot<span class="w"> </span><span class="m">2026</span>-03-15<span class="w">           </span><span class="c1"># specific date</span>
+inv<span class="w"> </span>restore-yadisk<span class="w"> </span>--yes<span class="w">                           </span><span class="c1"># skip confirm</span>
+inv<span class="w"> </span>restore-yadisk<span class="w"> </span>--prod<span class="w">                          </span><span class="c1"># restore production</span>
+</code></pre></div>
+<h3 id="two-intended-use-cases">Two intended use cases</h3>
+<ul>
+<li><strong>Laptop debug bootstrap.</strong> Materialize a recent prod snapshot
+  into <code>./data/dinary.db</code> on your workstation to reproduce a bug
+  against real data. Low risk: any overwrite of a local debug DB
+  is recoverable from the auto-saved
+  <code>data/dinary.db.before-restore-&lt;ts&gt;</code>.</li>
+<li><strong>Production disaster recovery.</strong> Add <code>--prod</code> and the same task
+  restores the server instead, driven entirely from the operator
+  machine.</li>
+</ul>
+<p>Every restore task writes the local database unless <code>--prod</code> is
+given, so no wrong terminal or stray tab-completion can reach
+production. Restores are never launched on the server itself: the
+<code>--prod</code> path issues plain SSH commands, so a restore does not
+depend on which revision happens to be deployed there.</p>
+<h3 id="flags">Flags</h3>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--snapshot DATE</code></td>
+<td><code>latest</code></td>
+<td>Filename date prefix, e.g. <code>2026-04-22</code> matches the full <code>dinary-2026-04-22T0317Z.db.zst</code></td>
+</tr>
+<tr>
+<td><code>--list-only</code></td>
+<td>off</td>
+<td>Read-only: enumerate available snapshots and exit</td>
+</tr>
+<tr>
+<td><code>--prod</code></td>
+<td>off</td>
+<td>Replace the production database instead of the local one</td>
+</tr>
+<tr>
+<td><code>--yes</code></td>
+<td>off</td>
+<td>Skip the "type yes to proceed" gate on a local restore. Never applies to <code>--prod</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="preconditions-one-time-per-machine">Preconditions (one-time per machine)</h3>
+<ul>
+<li><code>rclone</code>, <code>sqlite3</code>, <code>zstd</code> installed. All three are already
+  present on VM 1 via <code>inv setup-server</code>. On macOS: <code>brew install
+  rclone sqlite zstd</code>.</li>
+<li>A <code>yandex:</code> rclone remote configured locally. If it is absent,
+  <strong><code>restore-yadisk</code> prompts automatically</strong> (same WebDAV +
+  app-password flow as <code>inv setup-replica</code>). To pre-configure before
+  the first restore run: <code>inv setup-yadisk</code>.</li>
+</ul>
+<h3 id="safety-guarantees">Safety guarantees</h3>
+<ul>
+<li>The snapshot is decompressed into a tmpdir and
+  <code>PRAGMA integrity_check</code>'d <strong>before</strong> any existing database is
+  touched. A corrupt snapshot aborts the run with the live DB
+  untouched.</li>
+<li>Before the confirmation prompt both databases are summarized —
+  expense count and newest expense on each side — and the prompt
+  states how many expenses the restore drops. A stale snapshot
+  shows up as a number instead of as silently missing rows later.</li>
+<li>The replaced database is preserved next to the original:
+  <code>dinary.db.before-restore-&lt;UTC-ISO&gt;</code>, locally or on the server.</li>
+<li><code>--prod</code> asks for the literal word <code>prod</code>, and <code>--yes</code> does not
+  suppress it.</li>
+</ul>
+<h3 id="production-restore-runbook">Production restore runbook</h3>
+<p>Run from the operator machine; the source task depends on what
+survived:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>restore-replica<span class="w"> </span>--prod<span class="w">                       </span><span class="c1"># newest: VM2 WAL archive</span>
+inv<span class="w"> </span>restore-replica<span class="w"> </span>--timestamp<span class="w"> </span><span class="m">2026</span>-08-12T07:30:00Z<span class="w"> </span>--prod<span class="w">  </span><span class="c1"># point in time</span>
+inv<span class="w"> </span>restore-yadisk<span class="w"> </span>--snapshot<span class="w"> </span><span class="m">2026</span>-03-15<span class="w"> </span>--prod<span class="w">  </span><span class="c1"># daily off-site archive</span>
+</code></pre></div>
+<p>Each of them, in one run: downloads and verifies the snapshot,
+prints both sides plus what will be lost, asks for <code>prod</code>, stops
+<code>dinary</code> and <code>litestream</code>, preserves the current database, swaps
+the file, resyncs the replica, and brings both services back —
+reporting what production ended up holding.</p>
+<p>To inspect a snapshot before committing it, restore it locally
+first (no <code>--prod</code>), look at <code>data/dinary.db</code>, then re-run with
+<code>--prod</code>.</p>
+<p>If the operator machine is unavailable, the same result without
+this repository:</p>
+<div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>ubuntu@dinary-replica<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s1">&#39;litestream restore -config /tmp/ls.yml /tmp/dinary.db&#39;</span><span class="w">  </span><span class="c1"># from VM2&#39;s tree</span>
+scp<span class="w"> </span>ubuntu@dinary-replica:/tmp/dinary.db<span class="w"> </span>/tmp/dinary.db
+ssh<span class="w"> </span>ubuntu@dinary<span class="w"> </span><span class="s1">&#39;sudo systemctl stop dinary litestream&#39;</span>
+scp<span class="w"> </span>/tmp/dinary.db<span class="w"> </span>ubuntu@dinary:/home/ubuntu/dinary/data/dinary.db
+ssh<span class="w"> </span>ubuntu@dinary<span class="w"> </span><span class="s1">&#39;rm -f /home/ubuntu/dinary/data/dinary.db-wal \</span>
+<span class="s1">  /home/ubuntu/dinary/data/dinary.db-shm \</span>
+<span class="s1">  &amp;&amp; rm -rf /home/ubuntu/dinary/data/.dinary.db-litestream&#39;</span>
+ssh<span class="w"> </span>ubuntu@dinary-replica<span class="w"> </span><span class="s1">&#39;rm -rf /var/lib/litestream/dinary&#39;</span>
+ssh<span class="w"> </span>ubuntu@dinary<span class="w"> </span><span class="s1">&#39;sudo systemctl start litestream dinary&#39;</span>
+</code></pre></div>
+<h2 id="restore-from-cold-backup">Restore from cold backup</h2>
+<ol>
+<li>Stop the running service: <code>ssh $HOST 'sudo systemctl stop dinary'</code>.</li>
+<li>Replace <code>data/dinary.db</code> with the backed-up file.</li>
+<li>Remove any stale WAL sidecars: <code>rm -f data/dinary.db-wal data/dinary.db-shm</code>.</li>
+<li>Start the service: <code>inv restart-server</code>.</li>
+<li>Optionally run <code>inv verify-db</code> to check integrity.</li>
+</ol>
+<h2 id="deploy-restore-flow">Deploy + restore flow</h2>
+<p>To deploy a specific version with a DB restore (e.g. rollback after a bad deploy):</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>deploy<span class="w"> </span>--ref<span class="o">=</span>v0.4.0<span class="w"> </span>--no-start<span class="w">   </span><span class="c1"># deploy code but skip service start</span>
+inv<span class="w"> </span>restore-yadisk<span class="w"> </span>--prod<span class="w">            </span><span class="c1"># restore the server DB from Yandex.Disk</span>
+inv<span class="w"> </span>restart-server<span class="w">                   </span><span class="c1"># start; yoyo applies forward migrations</span>
+</code></pre></div>
+<h2 id="coordinated-import-reset">Coordinated import reset</h2>
+<p>To rebuild expenses and income from Google Sheets (e.g. after restoring a backup that predates recent sheet edits). The category catalog seeds itself automatically on service start:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>import-budget-all<span class="w"> </span>--yes
+inv<span class="w"> </span>import-income-all<span class="w"> </span>--yes
+inv<span class="w"> </span>import-verify-bootstrap-all
+inv<span class="w"> </span>import-verify-income-all
+</code></pre></div>
+<h2 id="vm2-host-key-refresh">VM2 host-key refresh</h2>
+<p>After VM2 is reprovisioned, refresh trust from the operator machine:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>setup-reset-trust
+</code></pre></div>
+<p>This wipes the old VM2 entry from VM1's <code>known_hosts</code>, re-scans, and re-installs VM1's pubkey in VM2's <code>authorized_keys</code>. Do <strong>not</strong> use this to resolve an unexpected host-key mismatch without physically confirming VM2 was reprovisioned — an unexpected mismatch is a security signal.</p>
+<h2 id="tailscale-sshd-break-glass">Tailscale sshd break-glass</h2>
+<blockquote>
+<p><strong>Current production posture:</strong> Tailscale-only SSH is <strong>not</strong> applied in production. It was tried and reverted. Reason: Oracle Cloud Serial Console authenticates by password — but our VMs are configured with key-only SSH and no <code>/etc/shadow</code> password. When both SSH access and the Tailscale Serve API endpoint depend on the same tailnet tunnel, a single <code>tailscaled</code> crash simultaneously kills operator access and the data plane with no independent break-glass path. Current posture: public-key SSH on <code>0.0.0.0:22</code> plus <code>fail2ban</code> (1-day initial ban, doubling to 30 days) to absorb brute-force noise. Key-only auth already defeats brute-force; fail2ban absorbs the log noise.</p>
+</blockquote>
+<p>If <code>--tailscale</code> was passed to <code>inv setup-server</code> (rebinds sshd to Tailscale-only) and you are locked out:</p>
+<ol>
+<li>Oracle Cloud console → VM Instance → <strong>Console connection</strong> → <strong>Launch Cloud Shell</strong></li>
+<li><code>sudo rm /etc/ssh/sshd_config.d/10-tailscale-only.conf</code></li>
+<li><code>sudo systemctl reload ssh</code></li>
+</ol>
+<h2 id="monitoring">Monitoring</h2>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>healthcheck<span class="w">            </span><span class="c1"># local data/dinary.db</span>
+inv<span class="w"> </span>healthcheck<span class="w"> </span>--prod<span class="w">   </span><span class="c1"># prod over SSH</span>
+</code></pre></div>
+<p>Checks: systemd services active, replica page count matches primary, yesterday's exchange rate
+cached, last expense logged to Google Sheets, no poisoned sheet-logging jobs. Exits non-zero
+when any check fails.</p>
+<p>A poisoned sheet-logging job is terminal — the expense never reaches the spreadsheet until
+the row is put back in the queue:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>requeue-sheet-jobs<span class="w"> </span>--prod<span class="w">   </span><span class="c1"># poisoned -&gt; pending, the drain retries on its next sweep</span>
+inv<span class="w"> </span>requeue-sheet-jobs<span class="w">          </span><span class="c1"># same against local data/dinary.db</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>backup-cloud-status<span class="w">                    </span><span class="c1"># newest Yandex.Disk snapshot age (exits non-zero if stale)</span>
+inv<span class="w"> </span>backup-cloud-status<span class="w"> </span>--max-age-hours<span class="w"> </span><span class="m">3</span><span class="w">  </span><span class="c1"># tighten threshold</span>
+inv<span class="w"> </span>backup-cloud-status<span class="w"> </span>--json-output<span class="w">      </span><span class="c1"># machine-readable</span>
+</code></pre></div>
+<h2 id="reporting-and-data-access">Reporting and data access</h2>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>report-expenses<span class="w">                   </span><span class="c1"># expenses by (category, event, tags)</span>
+inv<span class="w"> </span>report-expenses<span class="w"> </span>--year<span class="w"> </span><span class="m">2025</span><span class="w">       </span><span class="c1"># filter to a year</span>
+inv<span class="w"> </span>report-expenses<span class="w"> </span>--month<span class="w"> </span><span class="m">2025</span>-03<span class="w">   </span><span class="c1"># filter to a month</span>
+inv<span class="w"> </span>report-expenses<span class="w"> </span>--csv<span class="w">             </span><span class="c1"># CSV to stdout</span>
+inv<span class="w"> </span>report-expenses<span class="w"> </span>--prod<span class="w">          </span><span class="c1"># query prod DB over SSH</span>
+
+inv<span class="w"> </span>report-income<span class="w"> </span>--prod<span class="w">            </span><span class="c1"># income by year</span>
+
+inv<span class="w"> </span>sql<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;SELECT * FROM app_metadata ORDER BY key&quot;</span><span class="w">            </span><span class="c1"># read-only by default</span>
+inv<span class="w"> </span>sql<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;DELETE FROM expenses WHERE id = 999&quot;</span><span class="w"> </span>--write<span class="w">        </span><span class="c1"># opt into mutations</span>
+inv<span class="w"> </span>sql<span class="w"> </span>-f<span class="w"> </span>my_query.sql<span class="w"> </span>--csv<span class="w"> </span>&gt;<span class="w"> </span>out.csv
+inv<span class="w"> </span>sql<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;SELECT COUNT(*) FROM expenses&quot;</span><span class="w"> </span>--prod<span class="w">             </span><span class="c1"># prod snapshot over SSH</span>
+</code></pre></div>
+<h2 id="practical-guidance">Practical guidance</h2>
+<ul>
+<li>Three layers of redundancy, paired to their failure modes:
+  the pre-deploy snapshot covers "oops I nuked the DB during a manual repair";
+  Litestream to VM 2 covers "oops I lost VM 1"; Yandex.Disk
+  (<code>inv setup-replica</code>) covers "oops I lost both VMs / lost the
+  whole cloud provider".</li>
+<li>Treat <code>data/dinary.db</code> as the source of truth. Do not edit it
+  while the service is running, and never hand-edit the
+  <code>-wal</code>/<code>-shm</code> sidecars at all.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["toc.integrate","navigation.tracking","content.code.copy"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      
+    
+  </body>
+</html>

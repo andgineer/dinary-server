@@ -1,0 +1,2 @@
+INFO     dinary.sheets.sheet_mapping:sheet_mapping.py:347 sheet_mapping: modifiedTime shifted during reload (2026-04-20T10:00:00Z -> 2026-04-20T10:00:05Z); leaving cache unset so the next ensure_fresh() retries
+INFO     dinary.sheets.sheet_mapping:sheet_mapping.py:361 sheet_mapping reloaded: {'row_count': 1, 'modified_time': '2026-04-20T10:00:05Z', 'tab': 'map', 'modified_time_cached': False}

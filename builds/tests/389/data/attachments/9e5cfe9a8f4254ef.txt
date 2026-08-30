@@ -1,0 +1,2 @@
+=== npm ci (webapp/) ===
+=== Building _static/ via Vite (version abc1234) ===

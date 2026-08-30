@@ -1,0 +1,4 @@
+=== Stopping litestream on VM1 ===
+=== Wiping stale LTX tree on ubuntu@dinary-replica ===
+=== Starting litestream on VM1 (will push fresh snapshot) ===
+=== Replica resync done ===

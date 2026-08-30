@@ -1,0 +1,1 @@
+ERROR    dinary.background.sheet_logging.sheet_logging:sheet_logging.py:222 Logging projection: unknown category_id=1 for expense pk=1

@@ -1,0 +1,1 @@
+WARNING  dinary.adapters.receipts.serbian:serbian.py:191 Token not found in HTML for https://suf.purs.gov.rs/v/?vl=test, falling back to journal

@@ -1,0 +1,939 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Andrey Sorokin">
+      
+      
+        <link rel="canonical" href="https://andgineer.github.io/dinary/deploy-oracle/">
+      
+      
+        <link rel="prev" href="../pwa-install/">
+      
+      
+        <link rel="next" href="../deploy-selfhost/">
+      
+      
+        
+          <link rel="alternate" href="/dinary/" hreflang="en">
+        
+          <link rel="alternate" href="/dinary/ru/" hreflang="ru">
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.45">
+    
+    
+      
+        <title>Deploy on Oracle Cloud Free Tier - dinary</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deploy-on-oracle-cloud-free-tier" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="dinary" class="md-header__button md-logo" aria-label="dinary" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            dinary
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Deploy on Oracle Cloud Free Tier
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-languages" viewBox="0 0 24 24"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="/dinary/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="/dinary/ru/" hreflang="ru" class="md-select__link">
+              Русский
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/andgineer/dinary" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dinary
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="dinary" class="md-nav__button md-logo" aria-label="dinary" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    dinary
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/andgineer/dinary" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dinary
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dinary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Your Personal Financial Analyst
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../google-sheets-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Google Sheets Setup
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pwa-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Installing the PWA
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy on Oracle Cloud Free Tier
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy on Oracle Cloud Free Tier
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pricing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pricing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Prerequisites
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-create-an-account" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Create an account
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-set-up-networking-vcn" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Set up networking (VCN)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-create-a-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Create a VM
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-configure-deployenv" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Configure .deploy/.env
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Setup
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tailscale-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tailscale (default)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudflare" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Cloudflare
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#no-tunnel" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        No tunnel
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#maintenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Maintenance
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy-selfhost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Deploy on Your Own Computer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloudflare-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Cloudflare Tunnel &amp; Access Setup
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Database, Migrations, Backups, and Replication
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Development
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="deploy-on-oracle-cloud-free-tier">Deploy on Oracle Cloud Free Tier</h1>
+<p>Oracle Cloud Always Free tier provides permanent VMs — enough to run dinary indefinitely at zero cost.</p>
+<h2 id="pricing">Pricing</h2>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Free Tier Allocation</th>
+<th>Cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AMD Micro VM</td>
+<td>2 instances, 1 OCPU + 1 GB RAM each</td>
+<td>$0 forever</td>
+</tr>
+<tr>
+<td>ARM Ampere A1 VM</td>
+<td>Up to 4 OCPU, 24 GB RAM (shared pool — often unavailable)</td>
+<td>$0 forever</td>
+</tr>
+<tr>
+<td>Boot volume</td>
+<td>200 GB total</td>
+<td>$0</td>
+</tr>
+<tr>
+<td>Outbound data</td>
+<td>10 TB/month</td>
+<td>$0</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>$0/month</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Which shape to choose</p>
+<p><strong>AMD Micro</strong> (<code>VM.Standard.E2.1.Micro</code>, 1 GB RAM) is recommended — it is almost always available because Oracle reserves a dedicated pool for free-tier accounts. 1 GB RAM is enough for FastAPI without Docker.</p>
+<p><strong>ARM Ampere A1</strong> (<code>VM.Standard.A1.Flex</code>, up to 24 GB RAM) is more powerful but often unavailable ("Out of host capacity"). If you get one — great, otherwise use AMD Micro.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Oracle may reclaim idle Always Free instances. Running a lightweight server like dinary keeps the instance active. If reclaimed, you can recreate the VM, but the runtime source of truth is <code>data/dinary.db</code> on disk, not Google Sheets. Back up <code>~/dinary/data/</code> before destructive work and do not treat the sheet-logging spreadsheet as a full restore source.</p>
+</div>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>A Google service account JSON key at <code>~/.config/gspread/service_account.json</code> — see <a href="../google-sheets-setup/">Google Sheets Setup</a>.</li>
+<li>An SSH key pair for connecting to the VM.</li>
+</ul>
+<h2 id="1-create-an-account">1. Create an account</h2>
+<ol>
+<li>Go to <a href="https://cloud.oracle.com/">cloud.oracle.com</a> → <strong>Sign Up</strong>.</li>
+<li>Select your home region (cannot be changed later).</li>
+<li>Complete verification (credit card required but never charged for Always Free resources).</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Region selection</p>
+<p>Your home region is permanent. ARM instance availability varies by region. Community reports suggest <strong>Ashburn</strong>, <strong>Phoenix</strong>, <strong>Frankfurt</strong>, and <strong>London</strong> tend to have better ARM availability. However AMD Micro instances are available in all regions.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Account approval can take hours to days.</p>
+</div>
+<h2 id="2-set-up-networking-vcn">2. Set up networking (VCN)</h2>
+<p>Oracle VMs need a Virtual Cloud Network (VCN) with a public subnet and internet gateway. Create these <strong>before</strong> the VM:</p>
+<ol>
+<li>
+<p>Go to <strong>Networking</strong> → <strong>Virtual Cloud Networks</strong> → <strong>Create VCN</strong>.</p>
+<ul>
+<li><strong>Name</strong>: <code>dinary-vcn</code> (or any name)</li>
+<li><strong>IPv4 CIDR Blocks</strong>: <code>10.0.0.0/16</code></li>
+<li>Click <strong>Create VCN</strong>.</li>
+</ul>
+</li>
+<li>
+<p>Inside the new VCN → <strong>Subnets</strong> → <strong>Create Subnet</strong>.</p>
+<ul>
+<li><strong>Name</strong>: <code>public-subnet</code></li>
+<li><strong>Subnet type</strong>: Regional</li>
+<li><strong>IPv4 CIDR Block</strong>: <code>10.0.0.0/24</code></li>
+<li><strong>Subnet access</strong>: <strong>Public Subnet</strong></li>
+<li>Click <strong>Create Subnet</strong>.</li>
+</ul>
+</li>
+<li>
+<p>Inside the VCN → <strong>Internet Gateways</strong> → <strong>Create Internet Gateway</strong>.</p>
+<ul>
+<li><strong>Name</strong>: <code>internet-gw</code></li>
+<li>Click <strong>Create Internet Gateway</strong>.</li>
+</ul>
+</li>
+<li>
+<p>Inside the VCN → <strong>Route Tables</strong> → click the default route table → <strong>Add Route Rules</strong>.</p>
+<ul>
+<li><strong>Destination CIDR Block</strong>: <code>0.0.0.0/0</code></li>
+<li><strong>Target Type</strong>: Internet Gateway</li>
+<li><strong>Target</strong>: select <code>internet-gw</code></li>
+<li>Click <strong>Add Route Rules</strong>.</li>
+</ul>
+</li>
+</ol>
+<h2 id="3-create-a-vm">3. Create a VM</h2>
+<ol>
+<li>Go to <strong>Compute</strong> → <strong>Instances</strong> → <strong>Create Instance</strong>.</li>
+<li>Configure:<ul>
+<li><strong>Image</strong>: <code>Canonical Ubuntu 22.04 Minimal</code> (for AMD Micro — without <code>aarch64</code> in the name)</li>
+<li><strong>Shape</strong>: <code>VM.Standard.E2.1.Micro</code> — 1 OCPU, 1 GB RAM</li>
+<li><strong>Capacity</strong>: <code>On-demand capacity</code></li>
+<li><strong>Availability / Live migration</strong>: <code>Let Oracle Cloud Infrastructure choose the best migration option</code></li>
+<li><strong>Networking</strong>: select <code>dinary-vcn</code> → select <code>public-subnet</code> → check <strong>Automatically assign public IPv4 address</strong></li>
+<li><strong>SSH keys</strong>: upload your public key</li>
+<li><strong>Cloud-init script</strong>: leave empty</li>
+</ul>
+</li>
+<li>Click <strong>Create</strong>.</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">ARM alternative</p>
+<p>If ARM capacity is available, you can choose <code>Canonical Ubuntu 22.04 Minimal aarch64</code> + shape <code>VM.Standard.A1.Flex</code> (1 OCPU, 6 GB RAM). More RAM allows running Docker if desired. The rest of the setup is the same.</p>
+</div>
+<h2 id="4-configure-deployenv">4. Configure .deploy/.env</h2>
+<p>All per-instance configuration (everything that is not committed to the repo) lives under the <code>.deploy/</code> directory at the repo root. After the VM is created, copy the public IP from the Oracle dashboard and create <code>.deploy/.env</code> on the laptop:</p>
+<div class="highlight"><pre><span></span><code>mkdir<span class="w"> </span>-p<span class="w"> </span>.deploy
+cp<span class="w"> </span>.deploy.example/.env<span class="w"> </span>.deploy/.env
+</code></pre></div>
+<p>Edit <code>.deploy/.env</code>:</p>
+<div class="highlight"><pre><span></span><code>DINARY_DEPLOY_HOST=ubuntu@&lt;PUBLIC_IP&gt;
+# DINARY_TUNNEL=tailscale  # tailscale (default) | cloudflare | none
+# DINARY_SHEET_LOGGING_SPREADSHEET=https://docs.google.com/spreadsheets/d/YOUR_ID/edit
+</code></pre></div>
+<p><code>inv setup-server</code> syncs the local <code>.deploy/.env</code> to the VM under
+<code>/home/ubuntu/dinary/.deploy/</code>. The category catalog seeds itself
+automatically on first boot.</p>
+<p>Verify SSH access:</p>
+<div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>ubuntu@&lt;PUBLIC_IP&gt;
+</code></pre></div>
+<h2 id="5-setup">5. Setup</h2>
+<p>From your laptop, in the dinary repo:</p>
+<div class="highlight"><pre><span></span><code>inv<span class="w"> </span>setup-server
+</code></pre></div>
+<p>This single command performs everything on the VM via SSH:</p>
+<ul>
+<li>Installs system packages (python3, git)</li>
+<li>Installs uv (Python package manager)</li>
+<li>Clones the repo and installs dependencies</li>
+<li>Syncs your local <code>.deploy/.env</code> to the VM</li>
+<li>Uploads <code>~/.config/gspread/service_account.json</code> to the VM</li>
+<li>Creates and starts a <code>dinary</code> systemd service</li>
+<li>Sets up the tunnel (Tailscale by default, or Cloudflare — depending on <code>DINARY_TUNNEL</code>)</li>
+</ul>
+<h3 id="tailscale-default">Tailscale (default)</h3>
+<p>During setup, <code>tailscale up</code> prints a URL — open it in your browser to log in (create a free account if needed).</p>
+<p>Enable HTTPS in the <a href="https://login.tailscale.com/admin/dns">admin console</a>:</p>
+<ol>
+<li>Enable <strong>MagicDNS</strong> (if not already enabled).</li>
+<li>Enable <strong>HTTPS</strong> for your tailnet.</li>
+</ol>
+<p>The app will be reachable at <code>https://&lt;machine-name&gt;.&lt;tailnet&gt;.ts.net</code> — tailnet only, Tailscale must be running on the client device.</p>
+<div class="admonition warning">
+<p class="admonition-title">First launch: wait up to 10 minutes</p>
+<p>On first launch, Tailscale provisions a TLS certificate and propagates DNS. The URL may return <code>ERR_SSL_PROTOCOL_ERROR</code> for several minutes. Wait and retry.</p>
+</div>
+<h3 id="cloudflare">Cloudflare</h3>
+<p>Set <code>DINARY_TUNNEL=cloudflare</code> in <code>.deploy/.env</code> before running <code>inv setup-server</code>. During setup, <code>cloudflared tunnel login</code> will prompt you to authenticate in the browser. Requires a domain managed by Cloudflare DNS — see <a href="../cloudflare-setup/">Cloudflare Tunnel &amp; Access</a>.</p>
+<h3 id="no-tunnel">No tunnel</h3>
+<p>Set <code>DINARY_TUNNEL=none</code> to skip tunnel setup. You'll need to open firewall ports manually:</p>
+<p><strong>VCN Security List</strong>: add ingress rule — Source <code>0.0.0.0/0</code>, Protocol TCP, Port <code>8000</code>.</p>
+<p><strong>OS firewall</strong>:</p>
+<div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>ubuntu@&lt;PUBLIC_IP&gt;<span class="w"> </span><span class="s1">&#39;sudo iptables -I INPUT -p tcp --dport 8000 -j ACCEPT &amp;&amp; sudo netfilter-persistent save&#39;</span>
+</code></pre></div>
+<h2 id="maintenance">Maintenance</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>inv deploy --ref=main</code></td>
+<td>Checkout ref, sync deps, apply migrations, restart service</td>
+</tr>
+<tr>
+<td><code>inv status --prod</code></td>
+<td>Show dinary and tunnel service status</td>
+</tr>
+<tr>
+<td><code>inv logs --prod</code></td>
+<td>Tail dinary server logs</td>
+</tr>
+<tr>
+<td><code>inv setup-server</code></td>
+<td>Full re-setup (safe to re-run)</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["toc.integrate","navigation.tracking","content.code.copy"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      
+    
+  </body>
+</html>

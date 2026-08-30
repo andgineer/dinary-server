@@ -1,0 +1,3 @@
+WARNING  dinary.background.classification.task:task.py:515 classification execution_failed attempt 1/3 receipt_id=1
+WARNING  dinary.background.classification.task:task.py:515 classification execution_failed attempt 2/3 receipt_id=1
+WARNING  dinary.background.classification.task:task.py:515 classification execution_failed attempt 3/3 receipt_id=1

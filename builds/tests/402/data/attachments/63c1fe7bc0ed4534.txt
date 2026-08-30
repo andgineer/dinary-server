@@ -1,0 +1,1 @@
+WARNING  dinary_analytics.refresh:refresh.py:114 ledger replica refresh failed: first failure

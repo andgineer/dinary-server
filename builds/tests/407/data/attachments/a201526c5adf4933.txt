@@ -1,0 +1,1 @@
+--output names a local file and cannot be combined with --prod.

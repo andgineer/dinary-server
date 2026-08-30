@@ -1,0 +1,26 @@
+WARNING  dinary.background.classification.task:task.py:191 _process_job cancelled for receipt_id=99 — releasing
+ERROR    dinary.background.classification.task:task.py:204 Failed to release cancelled job receipt_id=99
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 196, in _drain_all_pending
+    await asyncio.to_thread(
+    ...<5 lines>...
+    )
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/asyncio/threads.py", line 26, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 313, in _release
+    release_job(conn, receipt_id, claim_token, retry_count, retry_after, last_error)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/dinary/dinary/src/dinary/db/receipts.py", line 242, in release_job
+    conn.execute(
+    ~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<5 lines>...
+        [retry_count, retry_after, last_error, receipt_id, claim_token],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: no such table: receipt_classification_jobs

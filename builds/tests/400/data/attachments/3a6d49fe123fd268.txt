@@ -1,0 +1,1 @@
+INFO     dinary.background.sheet_logging.sheet_logging:sheet_logging.py:364 Appended +1500.0 for Food/Essentials in 2026-04 (pk=1)

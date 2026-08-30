@@ -1,0 +1,1 @@
+=== Starting litestream on VM1 (will push a fresh snapshot) ===

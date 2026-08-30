@@ -1,0 +1,4 @@
+Missing local tools: rclone, sqlite3, zstd.
+  Ubuntu/Debian: sudo apt install rclone sqlite3 zstd
+  macOS: brew install rclone sqlite3 zstd
+Also ensure `rclone config` has run and a remote named 'yandex' exists (one-time OAuth browser click).

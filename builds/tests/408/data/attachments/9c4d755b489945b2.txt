@@ -1,0 +1,4 @@
+data/dinary.db: empty
+Snapshot dinary-2026-04-22T0317Z.db.zst: empty
+Previous dinary.db saved as dinary.db.before-restore-20260830T1550Z
+=== Restored data/dinary.db ===

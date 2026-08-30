@@ -1,0 +1,50 @@
+2026-07-28 15:32:52,921 INFO     yoyo.migrations — Applying 0001_initial_schema
+2026-07-28 15:32:52,921 INFO     yoyo.migrations —  - applying step 0
+2026-07-28 15:32:52,922 INFO     yoyo.migrations —  - applying step 1
+2026-07-28 15:32:52,922 INFO     yoyo.migrations —  - applying step 2
+2026-07-28 15:32:52,922 INFO     yoyo.migrations —  - applying step 3
+2026-07-28 15:32:52,922 INFO     yoyo.migrations —  - applying step 4
+2026-07-28 15:32:52,922 INFO     yoyo.migrations —  - applying step 5
+2026-07-28 15:32:52,923 INFO     yoyo.migrations —  - applying step 6
+2026-07-28 15:32:52,923 INFO     yoyo.migrations —  - applying step 7
+2026-07-28 15:32:52,923 INFO     yoyo.migrations —  - applying step 8
+2026-07-28 15:32:52,923 INFO     yoyo.migrations —  - applying step 9
+2026-07-28 15:32:52,923 INFO     yoyo.migrations —  - applying step 10
+2026-07-28 15:32:52,924 INFO     yoyo.migrations —  - applying step 11
+2026-07-28 15:32:52,924 INFO     yoyo.migrations —  - applying step 12
+2026-07-28 15:32:52,924 INFO     yoyo.migrations —  - applying step 13
+2026-07-28 15:32:52,924 INFO     yoyo.migrations —  - applying step 14
+2026-07-28 15:32:52,925 INFO     yoyo.migrations —  - applying step 15
+2026-07-28 15:32:52,925 INFO     yoyo.migrations —  - applying step 16
+2026-07-28 15:32:52,925 INFO     yoyo.migrations —  - applying step 17
+2026-07-28 15:32:52,925 INFO     yoyo.migrations —  - applying step 18
+2026-07-28 15:32:52,926 INFO     yoyo.migrations —  - applying step 19
+2026-07-28 15:32:52,926 INFO     yoyo.migrations —  - applying step 20
+2026-07-28 15:32:52,926 INFO     yoyo.migrations —  - applying step 21
+2026-07-28 15:32:52,926 INFO     yoyo.migrations —  - applying step 22
+2026-07-28 15:32:52,927 INFO     yoyo.migrations —  - applying step 23
+2026-07-28 15:32:52,927 INFO     yoyo.migrations —  - applying step 24
+2026-07-28 15:32:52,927 INFO     yoyo.migrations —  - applying step 25
+2026-07-28 15:32:52,927 INFO     yoyo.migrations —  - applying step 26
+2026-07-28 15:32:52,927 INFO     yoyo.migrations —  - applying step 27
+2026-07-28 15:32:52,928 INFO     yoyo.migrations —  - applying step 28
+2026-07-28 15:32:52,928 INFO     yoyo.migrations —  - applying step 29
+2026-07-28 15:32:52,928 INFO     yoyo.migrations —  - applying step 30
+2026-07-28 15:32:52,928 INFO     yoyo.migrations —  - applying step 31
+2026-07-28 15:32:52,928 INFO     yoyo.migrations —  - applying step 32
+2026-07-28 15:32:52,929 INFO     yoyo.migrations —  - applying step 33
+2026-07-28 15:32:52,929 INFO     yoyo.migrations —  - applying step 34
+2026-07-28 15:32:52,929 INFO     yoyo.migrations —  - applying step 35
+2026-07-28 15:32:52,933 INFO     yoyo.migrations — Marking 0001_initial_schema applied
+2026-07-28 15:32:52,934 INFO     yoyo.migrations — Applying 0002_llmbroker_1_3_0_upgrade
+2026-07-28 15:32:52,934 INFO     yoyo.migrations —  - applying step 0
+2026-07-28 15:32:52,934 INFO     yoyo.migrations —  - applying step 1
+2026-07-28 15:32:52,934 INFO     yoyo.migrations —  - applying step 2
+2026-07-28 15:32:52,935 INFO     yoyo.migrations —  - applying step 3
+2026-07-28 15:32:52,935 INFO     yoyo.migrations —  - applying step 4
+2026-07-28 15:32:52,935 INFO     yoyo.migrations —  - applying step 5
+2026-07-28 15:32:52,935 INFO     yoyo.migrations —  - applying step 6
+2026-07-28 15:32:52,935 INFO     yoyo.migrations —  - applying step 7
+2026-07-28 15:32:52,937 INFO     yoyo.migrations — Marking 0002_llmbroker_1_3_0_upgrade applied
+2026-07-28 15:32:52,946 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-07-28 15:32:52,954 INFO     dinary.background.classification.task — Receipt drain: completed receipt_id=1

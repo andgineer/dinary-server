@@ -1,0 +1,2 @@
+=== Building _static/ via Vite (version abc1234) ===
+Built _static/ with version abc1234

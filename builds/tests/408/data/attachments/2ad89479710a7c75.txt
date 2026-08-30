@@ -1,0 +1,4 @@
+2026-08-30 15:50:10,177 INFO     dinary.db.storage — anchored accounting_currency=EUR in app_metadata
+2026-08-30 15:50:10,202 INFO     llmbroker.broker — LLM openrouter: api_key_ref 'OPENROUTER_API_KEY' not resolved — inactive until the env var / secret is set; this is normal, the pool routes over whatever keys are present
+2026-08-30 15:50:10,205 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-30 15:50:10,273 INFO     dinary.background.rate_prefetch.task — prefetched RSD/EUR rate for 2026-08-30: 0.008520

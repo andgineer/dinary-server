@@ -1,0 +1,1 @@
+2026-08-14 13:16:11,480 INFO     dinary.background.sheet_logging.sheet_logging — Appended +1500.0 for Food/Essentials in 2026-04 (pk=1)

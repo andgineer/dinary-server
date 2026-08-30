@@ -1,0 +1,5 @@
+2026-08-21 13:57:38,021 INFO     dinary.db.storage — anchored accounting_currency=EUR in app_metadata
+2026-08-21 13:57:38,034 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-21 13:57:38,069 INFO     dinary.background.rate_prefetch.task — prefetched RSD/EUR rate for 2026-08-21: 0.008520
+2026-08-21 13:57:38,072 INFO     dinary.api.controllers.catalog_writer — catalog_writer add_tag(name='mapped-tag'): bumped catalog_version
+2026-08-21 13:57:38,080 INFO     dinary.api.controllers.catalog_writer — catalog_writer delete_tag(soft id=1): bumped catalog_version

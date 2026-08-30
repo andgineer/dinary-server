@@ -1,0 +1,3 @@
+INFO     dinary.sheets.sheet_mapping:sheet_mapping.py:361 sheet_mapping reloaded: {'row_count': 1, 'modified_time': '2026-04-20T10:00:00Z', 'tab': 'map', 'modified_time_cached': True}
+INFO     dinary.sheets.sheet_mapping:sheet_mapping.py:384 sheet_mapping: map-tab changed (2026-04-20T10:00:00Z -> 2026-04-20T11:00:00Z); reloading
+INFO     dinary.sheets.sheet_mapping:sheet_mapping.py:361 sheet_mapping reloaded: {'row_count': 1, 'modified_time': '2026-04-20T11:00:00Z', 'tab': 'map', 'modified_time_cached': True}

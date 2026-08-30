@@ -1,0 +1,10 @@
+2026-08-16 14:48:50,379 INFO     dinary.db.storage — anchored accounting_currency=EUR in app_metadata
+2026-08-16 14:48:50,391 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-16 14:48:50,395 INFO     dinary.background.rate_prefetch.task — prefetched RSD/EUR rate for 2026-08-16: 0.008522
+2026-08-16 14:48:50,459 ERROR    dinary.api.controllers.correction_ratings — record_quality failed for llm_name=groq score=0.5 — continuing
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/api/controllers/correction_ratings.py", line 98, in record_correction_ratings
+    await broker.record_quality(llm_name, CLASSIFICATION_OPERATION, score)
+  File "/home/runner/work/dinary/dinary/tests/api/test_api_rules_approve.py", line 224, in record_quality
+    raise RuntimeError("telemetry down")
+RuntimeError: telemetry down

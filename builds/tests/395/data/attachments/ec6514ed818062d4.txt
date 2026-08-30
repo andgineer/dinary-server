@@ -1,0 +1,15 @@
+2026-07-28 17:30:40,025 INFO     dinary.db.storage — anchored accounting_currency=RSD in app_metadata
+2026-07-28 17:30:40,035 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-07-28 17:30:40,037 WARNING  dinary.background.rate_prefetch.task — rate for RSD/RSD on 2026-07-28 not written to DB (stale fallback 1), retrying in 30 min
+2026-07-28 17:30:40,096 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-07-28 17:30:40,099 ERROR    dinary.background.classification.task — Permanent error for receipt_id=1 — poisoning
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 243, in _process_job
+    store_info = await _ensure_store(job, broker)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 383, in _ensure_store
+    store_id, chain_id = await resolve_store(broker, job.store_pib_raw, job.store_name_raw)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 2327, in _execute_mock_call
+    raise effect
+RuntimeError: store DB race

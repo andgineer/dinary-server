@@ -1,0 +1,834 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Andrey Sorokin">
+      
+      
+        <link rel="canonical" href="https://andgineer.github.io/dinary/google-sheets-setup/">
+      
+      
+        <link rel="prev" href="../installation/">
+      
+      
+        <link rel="next" href="../pwa-install/">
+      
+      
+        
+          <link rel="alternate" href="/dinary/" hreflang="en">
+        
+          <link rel="alternate" href="/dinary/ru/" hreflang="ru">
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="zensical-0.0.45">
+    
+    
+      
+        <title>Настройка Google Sheets - dinary</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#google-sheets" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="./.." title="dinary" class="md-header__button md-logo" aria-label="dinary" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            dinary
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Настройка Google Sheets
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-languages" viewBox="0 0 24 24"><path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="/dinary/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="/dinary/ru/" hreflang="ru" class="md-select__link">
+              Русский
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/andgineer/dinary" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dinary
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="./.." title="dinary" class="md-nav__button md-logo" aria-label="dinary" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-book-open" viewBox="0 0 24 24"><path d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
+
+    </a>
+    dinary
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/andgineer/dinary" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    dinary
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dinary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Персональный финансовый аналитик
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Установка
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Настройка Google Sheets
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Настройка Google Sheets
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-google-cloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        1. Создание проекта Google Cloud
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        2. Включение необходимых API
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        3. Создание сервисного аккаунта
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-json-" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        4. Скачивание JSON-ключа
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        5. Создание и расшаривание таблицы
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-dinary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        6. Настройка dinary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        7. Логгинг в таблицу (опционально)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Логгинг в таблицу (опционально)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Как это работает
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Включение
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Отключение
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Повторы автоматические
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pwa-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Установка PWA
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy-oracle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Развёртывание на Oracle Cloud Free Tier
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deploy-selfhost/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Деплой на свой компьютер
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cloudflare-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Настройка Cloudflare Tunnel и Access
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  База данных, миграции, резервные копии и репликация
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Разработка
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+  
+
+
+<h1 id="google-sheets">Настройка Google Sheets</h1>
+<p>Dinary server хранит runtime-данные в локальной SQLite-базе, а не в Google Sheets. В
+пользовательской и админской эксплуатации Google Sheets нужны только для
+опционального append-only sheet logging. Для работы нужен сервисный аккаунт
+Google и таблица, расшаренная на него.</p>
+<h2 id="1-google-cloud">1. Создание проекта Google Cloud</h2>
+<ol>
+<li>Перейдите на <a href="https://console.cloud.google.com/">console.cloud.google.com</a>.</li>
+<li>Нажмите <strong>Выберите проект</strong> → <strong>Новый проект</strong> → назовите его (например, <code>dinary</code>) → <strong>Создать</strong>.</li>
+<li>Выберите созданный проект.</li>
+</ol>
+<h2 id="2-api">2. Включение необходимых API</h2>
+<ol>
+<li>Перейдите в <strong>APIs &amp; Services</strong> → <strong>Library</strong>.</li>
+<li>Найдите <strong>Google Sheets API</strong> → нажмите → <strong>Enable</strong>.</li>
+<li>Вернитесь в <strong>Library</strong>, найдите <strong>Google Drive API</strong> → нажмите → <strong>Enable</strong>.</li>
+</ol>
+<h2 id="3">3. Создание сервисного аккаунта</h2>
+<ol>
+<li>Перейдите в <strong>APIs &amp; Services</strong> → <strong>Credentials</strong> → <strong>Create Credentials</strong> → <strong>Service account</strong>.</li>
+<li>Заполните:<ul>
+<li><strong>Name</strong>: <code>dinary</code> (или любое имя)</li>
+<li><strong>ID</strong>: генерируется автоматически</li>
+</ul>
+</li>
+<li>Нажмите <strong>Create and Continue</strong> → пропустите необязательные шаги → <strong>Done</strong>.</li>
+</ol>
+<h2 id="4-json-">4. Скачивание JSON-ключа</h2>
+<ol>
+<li>В разделе <strong>Credentials</strong> нажмите на созданный сервисный аккаунт.</li>
+<li>Перейдите в <strong>Keys</strong> → <strong>Add Key</strong> → <strong>Create new key</strong> → <strong>JSON</strong> → <strong>Create</strong>.</li>
+<li>Сохраните скачанный файл как <code>~/.config/gspread/service_account.json</code>:</li>
+</ol>
+<div class="highlight"><pre><span></span><code>mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/gspread
+mv<span class="w"> </span>~/Downloads/your-project-*.json<span class="w"> </span>~/.config/gspread/service_account.json
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Храните этот файл в секрете. Никогда не коммитьте его в Git — он уже добавлен в <code>.gitignore</code>.</p>
+</div>
+<h2 id="5">5. Создание и расшаривание таблицы</h2>
+<ol>
+<li>Перейдите на <a href="https://sheets.google.com/">sheets.google.com</a> → создайте новую таблицу.</li>
+<li>Назовите её (например, <code>Dinary Expenses</code>).</li>
+<li>Скопируйте ID таблицы из URL: <code>https://docs.google.com/spreadsheets/d/&lt;SPREADSHEET_ID&gt;/edit</code>.</li>
+<li>Нажмите <strong>Поделиться</strong> → вставьте email сервисного аккаунта (из JSON-ключа, поле <code>client_email</code>, вида <code>dinary@project-id.iam.gserviceaccount.com</code>) → роль <strong>Редактор</strong> → <strong>Отправить</strong>.</li>
+</ol>
+<h2 id="6-dinary">6. Настройка dinary</h2>
+<p>Runtime-настройки Google Sheets живут в <code>.deploy/.env</code> (переменные окружения):</p>
+<table>
+<thead>
+<tr>
+<th>Переменная</th>
+<th>Значение</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DINARY_GOOGLE_SHEETS_CREDENTIALS_PATH</code></td>
+<td>путь к <code>service_account.json</code> (по умолчанию: <code>~/.config/gspread/service_account.json</code>)</td>
+</tr>
+<tr>
+<td><code>DINARY_SHEET_LOGGING_SPREADSHEET</code></td>
+<td>опциональный ID или URL таблицы для append-only логгинга runtime-расходов (см. ниже)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="7">7. Логгинг в таблицу (опционально)</h2>
+<p>Sheet logging автоматически добавляет каждый новый расход в Google Sheets в реальном времени. Это удобно, если вы хотите строить сводные таблицы или графики в Google Sheets параллельно со встроенной аналитикой Dinary.</p>
+<h3 id="_1">Как это работает</h3>
+<ul>
+<li>Каждый <code>POST /api/expenses</code> добавляет строку в <strong>первый лист</strong> указанной таблицы.</li>
+<li>3D-категория/событие/теги проецируются в 2D <code>(sheet_category, sheet_group)</code> через таблицу <code>logging_mapping</code>. Если маппинг для категории не найден, название категории используется как fallback.</li>
+<li>Один и тот же лист может хранить <strong>несколько лет</strong> одновременно. Строки сортируются по <code>(год, месяц, sheet_category, sheet_group)</code>, новые блоки <code>(год, месяц)</code> уходят наверх. Год берётся из реального значения колонки A (Google показывает её как, например, <code>Apr-1</code>, но хранит <code>2026-04-01</code>), поэтому январь 2026 и январь 2027 не путаются между собой.</li>
+<li>В колонке J каждой добавленной строки лежит непрозрачный маркер <code>[exp:&lt;expense_id&gt;]</code>. Если предыдущая попытка добавления для того же расхода уже дошла до Google, но ответ был потерян (тайм-аут), следующая попытка увидит маркер и пропустит дублирующую запись.</li>
+<li>Если запись не удалась (ошибка сети, квота), задание остаётся в очереди и повторяется автоматически встроенным периодическим drain'ом (раз в <code>DINARY_SHEET_LOGGING_DRAIN_INTERVAL_SEC</code> секунд, по умолчанию 300; <code>0</code> отключает периодический drain).</li>
+</ul>
+<h3 id="_2">Включение</h3>
+<p>Установите <code>DINARY_SHEET_LOGGING_SPREADSHEET</code> — ID таблицы или полный URL из браузера:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Просто ID таблицы:</span>
+<span class="nv">DINARY_SHEET_LOGGING_SPREADSHEET</span><span class="o">=</span>YOUR_SPREADSHEET_ID_HERE
+
+<span class="c1"># Или полный URL (ID извлекается автоматически):</span>
+<span class="nv">DINARY_SHEET_LOGGING_SPREADSHEET</span><span class="o">=</span>https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID_HERE/edit
+</code></pre></div>
+<p>Таблица должна быть расшарена с сервисным аккаунтом из шага 4 (роль «Редактор»).</p>
+<h3 id="_3">Отключение</h3>
+<p>Оставьте <code>DINARY_SHEET_LOGGING_SPREADSHEET</code> пустой или не задавайте. Расходы по-прежнему сохраняются в SQLite; пропускается только запись в Google Sheets.</p>
+<h3 id="_4">Повторы автоматические</h3>
+<p>Отложенные задания обрабатываются автоматически встроенным периодическим drain-таском внутри процесса FastAPI. При запуске сервера все накопленные задания обрабатываются сразу; после этого drain повторяется каждые <code>DINARY_SHEET_LOGGING_DRAIN_INTERVAL_SEC</code> секунд (по умолчанию 300). Внешней CLI-команды для запуска нет — восстановление полностью автоматическое.</p>
+<p><strong>Ограничение скорости.</strong> За одну итерацию drain обрабатывает не более <code>DINARY_SHEET_LOGGING_DRAIN_MAX_ATTEMPTS_PER_ITERATION</code> строк (по умолчанию 15) с паузой <code>DINARY_SHEET_LOGGING_DRAIN_INTER_ROW_DELAY_SEC</code> секунд между попытками (по умолчанию 1.0). Одна попытка делает 1-3 вызова Google Sheets API (чтение маркера идемпотентности, при необходимости append, при необходимости очистка дубликата), поэтому установившийся темп обращений — от ~3 до ~9 вызовов в минуту, что комфортно укладывается в квоту 60/min на пользователя. Очередь из 60 записей после рестарта разбирается примерно за 20 минут; 1000 записей — несколько часов. Повышайте cap только если уверены в запасе по квотам Sheets API.</p>
+<p><strong>TTL.</strong> Записи для расходов старше <code>DINARY_SHEET_LOGGING_DRAIN_MAX_AGE_DAYS</code> дней (по умолчанию 90) молча пропускаются и остаются в <code>sheet_logging_jobs</code>. Чтобы записать старый расход в таблицу вручную, пересоздайте его или удалите соответствующую строку из очереди через CLI <code>sqlite3</code> при остановленном сервере.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Внешней CLI-команды для обработки очереди при работающем сервере нет. SQLite разрешает одновременно только одного писателя на файл, поэтому внешний drainer пришлось бы координировать с остановкой сервера. Lifespan-таск — единственный поддерживаемый recovery-путь.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["toc.integrate","navigation.tracking","content.code.copy"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      
+    
+  </body>
+</html>

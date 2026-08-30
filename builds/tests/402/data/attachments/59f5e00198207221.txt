@@ -1,0 +1,2 @@
+=== Restoring from ubuntu@test-replica LTX archive ===
+=== Point-in-time: 2026-08-12T07:30:00Z ===

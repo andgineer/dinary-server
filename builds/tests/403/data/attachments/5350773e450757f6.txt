@@ -1,0 +1,11 @@
+=== Installing baseline packages on ubuntu@dinary-replica ===
+=== Hardening sshd on ubuntu@dinary-replica ===
+=== Installing fail2ban on ubuntu@dinary-replica ===
+=== Provisioning /var/lib/litestream ===
+=== Installing backup packages (rclone, sqlite3, zstd) on ubuntu@dinary-replica ===
+=== Installing Litestream binary on ubuntu@dinary-replica ===
+=== Configuring Yandex.Disk rclone remote on ubuntu@dinary-replica ===
+=== Installing backup script on ubuntu@dinary-replica ===
+=== Configuring VM1 Litestream replicator ===
+=== Establishing VM1→VM2 SSH trust for Litestream SFTP ===
+=== Replica bootstrap done ===

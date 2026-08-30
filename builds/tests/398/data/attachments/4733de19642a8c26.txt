@@ -1,0 +1,1 @@
+2026-08-05 06:31:42,616 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)

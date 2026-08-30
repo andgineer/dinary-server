@@ -1,0 +1,3 @@
+=== Resetting VM2 host key (dinary-replica) in VM1 known_hosts ===
+=== Re-installing VM1 pubkey on VM2 authorized_keys ===
+=== Trust refreshed ===

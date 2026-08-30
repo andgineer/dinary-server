@@ -1,0 +1,2 @@
+OK: journal fallback uses, all time: 3
+OK: journal validation failures, all time: 1

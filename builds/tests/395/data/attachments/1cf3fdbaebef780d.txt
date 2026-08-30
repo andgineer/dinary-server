@@ -1,0 +1,19 @@
+2026-07-28 17:30:39,941 INFO     dinary.db.storage — anchored accounting_currency=RSD in app_metadata
+2026-07-28 17:30:39,951 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-07-28 17:30:39,954 WARNING  dinary.background.rate_prefetch.task — rate for RSD/RSD on 2026-07-28 not written to DB (stale fallback 1), retrying in 30 min
+2026-07-28 17:30:40,001 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-07-28 17:30:40,005 ERROR    dinary.background.classification.task — Permanent error for receipt_id=1 — poisoning
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 246, in _process_job
+    items = await asyncio.to_thread(_get_items, job.receipt_id)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/asyncio/threads.py", line 26, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 553, in _get_items
+    raise RuntimeError(
+        f"receipt_id={receipt_id}: no items after parsing — parse error",
+    )
+RuntimeError: receipt_id=1: no items after parsing — parse error

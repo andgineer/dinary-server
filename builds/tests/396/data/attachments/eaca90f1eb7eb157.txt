@@ -1,0 +1,1 @@
+INFO     dinary.background.sheet_logging.income_sheet_logging:income_sheet_logging.py:265 Income (2026, 5) updated to sheet

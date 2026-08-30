@@ -1,0 +1,1 @@
+INFO     dinary.background.sheet_logging.sheets_write:sheets_write.py:55 Inserted logging row at 6 for month 4 (Utilities/Electric)

@@ -1,0 +1,80 @@
+INFO     yoyo.migrations:base.py:527 Applying 0001_initial_schema
+INFO     yoyo.migrations:migrations.py:402  - applying step 0
+INFO     yoyo.migrations:migrations.py:402  - applying step 1
+INFO     yoyo.migrations:migrations.py:402  - applying step 2
+INFO     yoyo.migrations:migrations.py:402  - applying step 3
+INFO     yoyo.migrations:migrations.py:402  - applying step 4
+INFO     yoyo.migrations:migrations.py:402  - applying step 5
+INFO     yoyo.migrations:migrations.py:402  - applying step 6
+INFO     yoyo.migrations:migrations.py:402  - applying step 7
+INFO     yoyo.migrations:migrations.py:402  - applying step 8
+INFO     yoyo.migrations:migrations.py:402  - applying step 9
+INFO     yoyo.migrations:migrations.py:402  - applying step 10
+INFO     yoyo.migrations:migrations.py:402  - applying step 11
+INFO     yoyo.migrations:migrations.py:402  - applying step 12
+INFO     yoyo.migrations:migrations.py:402  - applying step 13
+INFO     yoyo.migrations:migrations.py:402  - applying step 14
+INFO     yoyo.migrations:migrations.py:402  - applying step 15
+INFO     yoyo.migrations:migrations.py:402  - applying step 16
+INFO     yoyo.migrations:migrations.py:402  - applying step 17
+INFO     yoyo.migrations:migrations.py:402  - applying step 18
+INFO     yoyo.migrations:migrations.py:402  - applying step 19
+INFO     yoyo.migrations:migrations.py:402  - applying step 20
+INFO     yoyo.migrations:migrations.py:402  - applying step 21
+INFO     yoyo.migrations:migrations.py:402  - applying step 22
+INFO     yoyo.migrations:migrations.py:402  - applying step 23
+INFO     yoyo.migrations:migrations.py:402  - applying step 24
+INFO     yoyo.migrations:migrations.py:402  - applying step 25
+INFO     yoyo.migrations:migrations.py:402  - applying step 26
+INFO     yoyo.migrations:migrations.py:402  - applying step 27
+INFO     yoyo.migrations:migrations.py:402  - applying step 28
+INFO     yoyo.migrations:migrations.py:402  - applying step 29
+INFO     yoyo.migrations:migrations.py:402  - applying step 30
+INFO     yoyo.migrations:migrations.py:402  - applying step 31
+INFO     yoyo.migrations:migrations.py:402  - applying step 32
+INFO     yoyo.migrations:migrations.py:402  - applying step 33
+INFO     yoyo.migrations:migrations.py:402  - applying step 34
+INFO     yoyo.migrations:migrations.py:402  - applying step 35
+INFO     yoyo.migrations:base.py:557 Marking 0001_initial_schema applied
+INFO     yoyo.migrations:base.py:527 Applying 0002_llmbroker_1_3_0_upgrade
+INFO     yoyo.migrations:migrations.py:402  - applying step 0
+INFO     yoyo.migrations:migrations.py:402  - applying step 1
+INFO     yoyo.migrations:migrations.py:402  - applying step 2
+INFO     yoyo.migrations:migrations.py:402  - applying step 3
+INFO     yoyo.migrations:migrations.py:402  - applying step 4
+INFO     yoyo.migrations:migrations.py:402  - applying step 5
+INFO     yoyo.migrations:migrations.py:402  - applying step 6
+INFO     yoyo.migrations:migrations.py:402  - applying step 7
+INFO     yoyo.migrations:base.py:557 Marking 0002_llmbroker_1_3_0_upgrade applied
+INFO     dinary.background.classification.task:task.py:236 Receipt drain: processing receipt_id=1
+WARNING  dinary.background.classification.task:task.py:267 Transient error for receipt_id=1 (timeout) — releasing for retry in 0s (attempt 1)
+ERROR    dinary.background.classification.task:task.py:284 Failed to release receipt_id=1 — stale timeout will recover
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 239, in _process_job
+    parsed = await parse_receipt(job.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 2327, in _execute_mock_call
+    raise effect
+dinary.adapters.receipts.types.ParserRequestError: timeout
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 275, in _process_job
+    await asyncio.to_thread(
+    ...<6 lines>...
+    )
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/asyncio/threads.py", line 26, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1234, in _execute_mock_call
+    raise effect
+sqlite3.OperationalError: database is locked

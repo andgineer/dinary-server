@@ -1,0 +1,7 @@
+2026-08-16 14:33:37,898 INFO     dinary.db.storage — anchored accounting_currency=RSD in app_metadata
+2026-08-16 14:33:37,910 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-16 14:33:37,912 WARNING  dinary.background.rate_prefetch.task — rate for RSD/RSD on 2026-08-16 not written to DB (stale fallback 1), retrying in 30 min
+2026-08-16 14:33:37,980 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-08-16 14:33:37,984 WARNING  dinary.background.classification.task — Transient error for receipt_id=1 (LLM broker unavailable for receipt_id=1 — all providers returned None, releasing for retry) — releasing for retry in 0s (attempt 1)
+2026-08-16 14:33:37,993 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-08-16 14:33:37,997 INFO     dinary.background.classification.task — Receipt drain: completed receipt_id=1

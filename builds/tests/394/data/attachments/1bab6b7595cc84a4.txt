@@ -1,0 +1,3 @@
+2026-07-28 17:05:19,134 INFO     dinary.db.storage — anchored accounting_currency=RSD in app_metadata
+2026-07-28 17:05:19,147 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-07-28 17:05:19,150 WARNING  dinary.background.rate_prefetch.task — rate for RSD/RSD on 2026-07-28 not written to DB (stale fallback 1), retrying in 30 min

@@ -1,0 +1,51 @@
+INFO     yoyo.migrations:base.py:527 Applying 0001_initial_schema
+INFO     yoyo.migrations:migrations.py:402  - applying step 0
+INFO     yoyo.migrations:migrations.py:402  - applying step 1
+INFO     yoyo.migrations:migrations.py:402  - applying step 2
+INFO     yoyo.migrations:migrations.py:402  - applying step 3
+INFO     yoyo.migrations:migrations.py:402  - applying step 4
+INFO     yoyo.migrations:migrations.py:402  - applying step 5
+INFO     yoyo.migrations:migrations.py:402  - applying step 6
+INFO     yoyo.migrations:migrations.py:402  - applying step 7
+INFO     yoyo.migrations:migrations.py:402  - applying step 8
+INFO     yoyo.migrations:migrations.py:402  - applying step 9
+INFO     yoyo.migrations:migrations.py:402  - applying step 10
+INFO     yoyo.migrations:migrations.py:402  - applying step 11
+INFO     yoyo.migrations:migrations.py:402  - applying step 12
+INFO     yoyo.migrations:migrations.py:402  - applying step 13
+INFO     yoyo.migrations:migrations.py:402  - applying step 14
+INFO     yoyo.migrations:migrations.py:402  - applying step 15
+INFO     yoyo.migrations:migrations.py:402  - applying step 16
+INFO     yoyo.migrations:migrations.py:402  - applying step 17
+INFO     yoyo.migrations:migrations.py:402  - applying step 18
+INFO     yoyo.migrations:migrations.py:402  - applying step 19
+INFO     yoyo.migrations:migrations.py:402  - applying step 20
+INFO     yoyo.migrations:migrations.py:402  - applying step 21
+INFO     yoyo.migrations:migrations.py:402  - applying step 22
+INFO     yoyo.migrations:migrations.py:402  - applying step 23
+INFO     yoyo.migrations:migrations.py:402  - applying step 24
+INFO     yoyo.migrations:migrations.py:402  - applying step 25
+INFO     yoyo.migrations:migrations.py:402  - applying step 26
+INFO     yoyo.migrations:migrations.py:402  - applying step 27
+INFO     yoyo.migrations:migrations.py:402  - applying step 28
+INFO     yoyo.migrations:migrations.py:402  - applying step 29
+INFO     yoyo.migrations:migrations.py:402  - applying step 30
+INFO     yoyo.migrations:migrations.py:402  - applying step 31
+INFO     yoyo.migrations:migrations.py:402  - applying step 32
+INFO     yoyo.migrations:migrations.py:402  - applying step 33
+INFO     yoyo.migrations:migrations.py:402  - applying step 34
+INFO     yoyo.migrations:migrations.py:402  - applying step 35
+INFO     yoyo.migrations:base.py:557 Marking 0001_initial_schema applied
+INFO     yoyo.migrations:base.py:527 Applying 0002_llmbroker_1_3_0_upgrade
+INFO     yoyo.migrations:migrations.py:402  - applying step 0
+INFO     yoyo.migrations:migrations.py:402  - applying step 1
+INFO     yoyo.migrations:migrations.py:402  - applying step 2
+INFO     yoyo.migrations:migrations.py:402  - applying step 3
+INFO     yoyo.migrations:migrations.py:402  - applying step 4
+INFO     yoyo.migrations:migrations.py:402  - applying step 5
+INFO     yoyo.migrations:migrations.py:402  - applying step 6
+INFO     yoyo.migrations:migrations.py:402  - applying step 7
+INFO     yoyo.migrations:base.py:557 Marking 0002_llmbroker_1_3_0_upgrade applied
+INFO     dinary.background.classification.task:task.py:238 Receipt drain: processing receipt_id=1
+WARNING  dinary.background.classification.task:task.py:527 classification execution_failed attempt 1/1 receipt_id=1
+INFO     dinary.background.classification.task:task.py:250 Receipt drain: completed receipt_id=1

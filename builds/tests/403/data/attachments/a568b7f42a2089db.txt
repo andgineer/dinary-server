@@ -1,0 +1,2 @@
+Poisoned on data/dinary.db: 1 expense job(s), 0 income job(s)
+Requeued 1 job(s); the drain picks them up on its next sweep

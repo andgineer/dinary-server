@@ -1,0 +1,4 @@
+2026-08-05 06:31:03,714 INFO     dinary.db.storage — anchored accounting_currency=EUR in app_metadata
+2026-08-05 06:31:03,727 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-05 06:31:03,742 INFO     dinary.background.rate_prefetch.task — prefetched RSD/EUR rate for 2026-08-05: 0.008519
+2026-08-05 06:31:03,748 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='shared': diff=datetime: stored=datetime.datetime(2026, 1, 15, 11, 0, tzinfo=datetime.timezone(datetime.timedelta(seconds=3600))) incoming=datetime.datetime(2027, 1, 15, 11, 0, tzinfo=zoneinfo.ZoneInfo(key='Europe/Belgrade'))

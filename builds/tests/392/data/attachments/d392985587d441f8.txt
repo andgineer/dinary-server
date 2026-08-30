@@ -1,0 +1,1 @@
+WARNING  dinary.background.rate_prefetch.task:task.py:69 rate for RSD/EUR on 2025-02-24 not written to DB (stale fallback 117.32), retrying in 30 min

@@ -1,0 +1,1 @@
+FAIL: only one backup found (dinary-2026-04-20T0317Z.db.zst, 0.2 KB) — cannot verify replica is not frozen. Expected daily backups.

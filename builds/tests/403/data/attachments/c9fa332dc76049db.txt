@@ -1,0 +1,1 @@
+2026-08-16 10:18:24,661 ERROR    dinary.background.sheet_logging.sheet_logging — Queue row for pk=1 has no client_expense_id; poisoning (runtime rows must carry a UUID)

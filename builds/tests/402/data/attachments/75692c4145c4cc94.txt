@@ -1,0 +1,1 @@
+yandex: remote already configured and healthy — skipping prompt.

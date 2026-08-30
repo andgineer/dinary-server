@@ -1,0 +1,1 @@
+dinary-ai not running on port 8765 — running setup-dinary-ai

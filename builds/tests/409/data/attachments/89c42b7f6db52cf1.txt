@@ -1,0 +1,18 @@
+INFO     dinary.db.storage:storage.py:240 anchored accounting_currency=RSD in app_metadata
+INFO     dinary.background.sheet_logging.task:task.py:49 sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+WARNING  dinary.background.rate_prefetch.task:task.py:69 rate for RSD/RSD on 2026-08-30 not written to DB (stale fallback 1), retrying in 30 min
+INFO     dinary.background.classification.task:task.py:238 Receipt drain: processing receipt_id=1
+INFO     dinary.background.classification.task:task.py:250 Receipt drain: completed receipt_id=1
+ERROR    dinary.api.controllers.correction_ratings:correction_ratings.py:100 record_quality failed for llm_name=test-model score=0.0 — continuing
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/api/controllers/correction_ratings.py", line 98, in record_correction_ratings
+    await broker.record_quality(llm_name, CLASSIFICATION_OPERATION, score)
+  File "/home/runner/work/dinary/dinary/.venv/lib/python3.13/site-packages/llmbroker/broker/broker.py", line 230, in record_quality
+    await self.ensure_pool()
+  File "/home/runner/work/dinary/dinary/.venv/lib/python3.13/site-packages/llmbroker/broker/broker.py", line 144, in ensure_pool
+    await self._catalog.provision()
+  File "/home/runner/work/dinary/dinary/.venv/lib/python3.13/site-packages/llmbroker/broker/catalog.py", line 40, in provision
+    raise RuntimeError(
+    ...<2 lines>...
+    )
+RuntimeError: registry is empty — call sync(preset) to mirror a preset into it before provisioning (e.g. `await broker.sync(preset)` or `python -m llmbroker sync`)

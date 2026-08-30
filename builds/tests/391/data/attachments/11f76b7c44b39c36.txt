@@ -1,0 +1,1 @@
+INFO     dinary.adapters.rates.nbp:nbp.py:39 Got rate from NBP table B for RSD

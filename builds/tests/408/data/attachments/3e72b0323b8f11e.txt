@@ -1,0 +1,3 @@
+Prod: 5 expenses, last unknown
+Snapshot: 1 expenses, last 2026-08-13 03:27
+=== Prod: 5 expenses, last unknown ===

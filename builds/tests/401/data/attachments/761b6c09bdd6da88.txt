@@ -1,0 +1,3 @@
+/tmp/pytest-of-runner/pytest-0/test_refusal_leaves_the_target0/data/dinary.db: 1 expenses, last 2026-08-14 09:41
+Snapshot: 1 expenses, last 2026-08-13 03:27
+Losing: 1 expenses recorded after 2026-08-13 03:27

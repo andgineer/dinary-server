@@ -1,0 +1,2 @@
+OK: /specifications fallback uses, all time: 1
+OK: last /specifications fallback older than alert window — 2026-08-03T05:31:40.834914+00:00 | invoice: XYZ | reason: HTTP 503

@@ -1,0 +1,1 @@
+FAIL: /specifications fallback used — 2026-08-05T05:31:40.869296 | invoice: XYZ | reason: HTTP 503

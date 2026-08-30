@@ -1,0 +1,2 @@
+analytics.db → /tmp/pytest-of-runner/pytest-1/test_backup_then_restore_recov0/backup.db.zst  (0.2 KB)
+Restored analytics.db from /tmp/pytest-of-runner/pytest-1/test_backup_then_restore_recov0/backup.db.zst

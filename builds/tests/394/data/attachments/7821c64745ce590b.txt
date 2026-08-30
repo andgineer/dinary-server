@@ -1,0 +1,1 @@
+2026-07-28 17:05:09,388 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='x2': diff=amount: stored=Decimal('10') incoming=Decimal('99.0'); amount_original: stored=Decimal('10') incoming=Decimal('99.0')

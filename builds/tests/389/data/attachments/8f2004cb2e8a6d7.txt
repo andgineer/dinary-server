@@ -1,0 +1,1 @@
+Backup file not found: /tmp/pytest-of-runner/pytest-1/test_restore_missing_file_exit0/ghost.db.zst

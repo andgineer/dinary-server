@@ -1,0 +1,2 @@
+usage: __main__.py [-h] [--year YEAR | --month MONTH] [--csv | --json]
+__main__.py: error: argument --json: not allowed with argument --csv

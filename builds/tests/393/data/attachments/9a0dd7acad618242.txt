@@ -1,0 +1,1 @@
+WARNING  dinary.background.classification.task:task.py:515 classification execution_failed attempt 1/2 receipt_id=1

@@ -1,0 +1,1 @@
+2026-08-30 15:50:51,099 INFO     dinary.background.sheet_logging.sheets_write — Inserted logging row at 3 for month 4 (Pharmacy/)

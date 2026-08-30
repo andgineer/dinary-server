@@ -1,0 +1,1 @@
+FAIL: receipt classification queue not empty: pending=1

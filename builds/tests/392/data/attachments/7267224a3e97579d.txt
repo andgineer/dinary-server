@@ -1,0 +1,7 @@
+2026-07-28 16:09:27,630 ERROR    dinary.api.controllers.correction_ratings — record_quality failed for llm_name=groq score=0.0 — continuing
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/api/controllers/correction_ratings.py", line 98, in record_correction_ratings
+    await broker.record_quality(llm_name, CLASSIFICATION_OPERATION, score)
+  File "/home/runner/work/dinary/dinary/tests/api/test_expense_correction_rating.py", line 325, in record_quality
+    raise RuntimeError("telemetry down")
+RuntimeError: telemetry down

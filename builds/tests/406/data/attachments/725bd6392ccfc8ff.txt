@@ -1,0 +1,5 @@
+/tmp/pytest-of-runner/pytest-0/test_local_target_is_overwritt0/data/dinary.db: 1 expenses, last 2026-08-14 09:41
+Snapshot: 1 expenses, last 2026-08-13 03:27
+Losing: 1 expenses recorded after 2026-08-13 03:27
+Previous dinary.db saved as dinary.db.before-restore-20260816T1449Z
+=== Restored /tmp/pytest-of-runner/pytest-0/test_local_target_is_overwritt0/data/dinary.db ===

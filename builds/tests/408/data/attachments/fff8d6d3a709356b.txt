@@ -1,0 +1,1 @@
+FAIL: journal receipt validation failed — not-a-date | invoice: XYZ | reason: item total mismatch

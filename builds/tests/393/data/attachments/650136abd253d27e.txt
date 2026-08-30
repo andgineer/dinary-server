@@ -1,0 +1,23 @@
+ERROR    dinary.background.sheet_logging.sheet_logging:sheet_logging.py:310 Append to sheet failed for expense pk=1
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/sheet_logging/sheet_logging.py", line 285, in _drain_one_job
+    wrote_new_row = _append_row_to_sheet(
+        spreadsheet_id,
+    ...<10 lines>...
+        ),
+    )
+  File "/home/runner/work/dinary/dinary/src/dinary/background/sheet_logging/sheet_logging.py", line 354, in _append_row_to_sheet
+    written = append_expense_atomic(
+        ws,
+    ...<4 lines>...
+        rate=expense_row.rate,
+    )
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1234, in _execute_mock_call
+    raise effect
+RuntimeError: simulated sheet failure

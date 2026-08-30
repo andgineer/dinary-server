@@ -1,0 +1,9 @@
+=== Stopping dinary and litestream on VM1 ===
+=== Stopping litestream on VM1 ===
+=== Previous prod DB saved as /home/ubuntu/dinary/data/dinary.db.before-restore-20260814T1316Z ===
+=== Wiping stale LTX shadow tree on VM1 ===
+=== Wiping stale LTX tree on ubuntu@replica ===
+=== Starting litestream on VM1 (will push a fresh snapshot) ===
+=== Starting dinary on VM1 ===
+=== dinary: ok ===
+=== litestream: ok ===

@@ -1,0 +1,4 @@
+INFO     llmbroker.broker:catalog.py:94 LLM groq-llama: api_key_ref 'GROQ_API_KEY' not resolved — inactive until the env var / secret is set; this is normal, the pool routes over whatever keys are present
+INFO     llmbroker.broker:catalog.py:94 LLM openrouter: api_key_ref 'OPENROUTER_API_KEY' not resolved — inactive until the env var / secret is set; this is normal, the pool routes over whatever keys are present
+INFO     llmbroker.broker:catalog.py:94 LLM groq-llama: api_key_ref 'GROQ_API_KEY' not resolved — inactive until the env var / secret is set; this is normal, the pool routes over whatever keys are present
+INFO     llmbroker.broker:catalog.py:94 LLM openrouter: api_key_ref 'OPENROUTER_API_KEY' not resolved — inactive until the env var / secret is set; this is normal, the pool routes over whatever keys are present

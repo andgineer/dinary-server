@@ -1,0 +1,6 @@
+2026-08-13 11:01:37,382 ERROR    dinary.db.storage — Best-effort ROLLBACK failed (context: test)
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/db/storage.py", line 135, in best_effort_rollback
+    con.execute("ROLLBACK")
+    ~~~~~~~~~~~^^^^^^^^^^^^
+sqlite3.ProgrammingError: Cannot operate on a closed database.

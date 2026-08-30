@@ -1,0 +1,21 @@
+ERROR    dinary.background.rate_prefetch.task:task.py:91 rate prefetch failed
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/rate_prefetch/task.py", line 61, in rate_prefetch_task
+    rate = await asyncio.to_thread(_get_rate_blocking, today, source, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/asyncio/threads.py", line 26, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/home/runner/work/dinary/dinary/src/dinary/background/rate_prefetch/task.py", line 37, in _get_rate_blocking
+    return get_rate(con, rate_date, source, target)
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 1234, in _execute_mock_call
+    raise effect
+ValueError: no rate

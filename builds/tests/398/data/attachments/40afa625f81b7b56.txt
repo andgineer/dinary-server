@@ -1,0 +1,12 @@
+2026-08-05 06:31:36,978 INFO     dinary.db.storage — anchored accounting_currency=RSD in app_metadata
+2026-08-05 06:31:36,991 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-05 06:31:36,993 WARNING  dinary.background.rate_prefetch.task — rate for RSD/RSD on 2026-08-05 not written to DB (stale fallback 1), retrying in 30 min
+2026-08-05 06:31:37,066 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-08-05 06:31:37,066 ERROR    dinary.background.classification.task — Permanent error for receipt_id=1 — poisoning
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 239, in _process_job
+    parsed = await parse_receipt(job.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.14/x64/lib/python3.13/unittest/mock.py", line 2327, in _execute_mock_call
+    raise effect
+OSError: disk I/O error

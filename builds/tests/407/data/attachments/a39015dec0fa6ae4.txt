@@ -1,0 +1,4 @@
+INFO     dinary.db.storage:storage.py:240 anchored accounting_currency=EUR in app_metadata
+INFO     dinary.background.sheet_logging.task:task.py:49 sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+INFO     dinary.background.rate_prefetch.task:task.py:79 prefetched RSD/EUR rate for 2026-08-21: 0.008520
+INFO     dinary.db.expenses:expenses.py:255 insert_expense conflict for client_expense_id='e_tag_mismatch': diff=amount: stored=Decimal('5') incoming=Decimal('99.0'); amount_original: stored=Decimal('5') incoming=Decimal('99.0')

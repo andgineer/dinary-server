@@ -1,0 +1,1 @@
+stale yandex: remote removed from local rclone — re-prompting

@@ -1,0 +1,1 @@
+STALE: no snapshots on yandex:Backup/dinary/ (threshold: 26h)

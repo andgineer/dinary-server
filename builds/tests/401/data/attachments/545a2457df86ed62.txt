@@ -1,0 +1,8 @@
+2026-08-14 13:03:07,777 INFO     dinary.db.storage — anchored accounting_currency=EUR in app_metadata
+2026-08-14 13:03:07,790 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-14 13:03:07,816 INFO     dinary.background.rate_prefetch.task — prefetched RSD/EUR rate for 2026-08-14: 0.008522
+2026-08-14 13:03:07,820 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='e_concurrent_mixed': diff=amount: stored=Decimal('10') incoming=Decimal('12.0'); amount_original: stored=Decimal('10') incoming=Decimal('12.0')
+2026-08-14 13:03:07,823 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='e_concurrent_mixed': diff=amount: stored=Decimal('10') incoming=Decimal('15.0'); amount_original: stored=Decimal('10') incoming=Decimal('15.0')
+2026-08-14 13:03:07,824 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='e_concurrent_mixed': diff=amount: stored=Decimal('10') incoming=Decimal('11.0'); amount_original: stored=Decimal('10') incoming=Decimal('11.0')
+2026-08-14 13:03:07,826 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='e_concurrent_mixed': diff=amount: stored=Decimal('10') incoming=Decimal('13.0'); amount_original: stored=Decimal('10') incoming=Decimal('13.0')
+2026-08-14 13:03:07,828 INFO     dinary.db.expenses — insert_expense conflict for client_expense_id='e_concurrent_mixed': diff=amount: stored=Decimal('10') incoming=Decimal('14.0'); amount_original: stored=Decimal('10') incoming=Decimal('14.0')

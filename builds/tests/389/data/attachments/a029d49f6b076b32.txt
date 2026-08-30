@@ -1,0 +1,1 @@
+WARNING  dinary.sheets.sheet_mapping:sheet_mapping.py:482 events.auto_tags for event_id=1 is not valid JSON ('not-json'); treating as empty

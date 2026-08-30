@@ -1,0 +1,1 @@
+INFO     dinary.api.controllers.catalog_writer:catalog_writer.py:82 catalog_writer edit_event(id=1): bumped catalog_version

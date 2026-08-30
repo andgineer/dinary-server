@@ -1,0 +1,3 @@
+2026-07-28 15:32:50,070 WARNING  dinary.background.classification.task — classification execution_failed attempt 1/3 receipt_id=1
+2026-07-28 15:32:50,071 WARNING  dinary.background.classification.task — classification execution_failed attempt 2/3 receipt_id=1
+2026-07-28 15:32:50,072 WARNING  dinary.background.classification.task — classification execution_failed attempt 3/3 receipt_id=1

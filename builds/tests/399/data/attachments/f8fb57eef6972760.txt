@@ -1,0 +1,1 @@
+WARNING  dinary.adapters.rates.service:service.py:71 NBS could not resolve RSD/EUR on 2025-02-24, falling back to NBP

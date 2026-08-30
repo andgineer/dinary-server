@@ -1,0 +1,4 @@
+2026-07-28 13:19:55,321 INFO     dinary.db.storage — anchored accounting_currency=EUR in app_metadata
+2026-07-28 13:19:55,333 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-07-28 13:19:55,348 INFO     dinary.background.rate_prefetch.task — prefetched RSD/EUR rate for 2026-07-28: 0.008516
+2026-07-28 13:19:55,384 INFO     dinary.adapters.rates.nbs — Got rate from NBS

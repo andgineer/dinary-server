@@ -1,0 +1,17 @@
+2026-08-30 15:50:30,926 INFO     dinary.db.storage — anchored accounting_currency=RSD in app_metadata
+2026-08-30 15:50:30,936 INFO     dinary.background.sheet_logging.task — sheet-logging task disabled (interval<=0 or DINARY_SHEET_LOGGING_SPREADSHEET unset)
+2026-08-30 15:50:30,975 WARNING  dinary.background.rate_prefetch.task — rate for RSD/RSD on 2026-08-30 not written to DB (stale fallback 1), retrying in 30 min
+2026-08-30 15:50:30,984 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-08-30 15:50:30,995 INFO     dinary.background.classification.task — Receipt drain: completed receipt_id=1
+2026-08-30 15:50:30,997 INFO     dinary.background.classification.task — Receipt drain: processing receipt_id=1
+2026-08-30 15:50:30,999 ERROR    dinary.background.classification.task — Permanent error for receipt_id=1 — poisoning
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 249, in _process_job
+    await _classify_and_persist(broker, job, items, store_id, chain_id)
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 606, in _classify_and_persist
+    llm_results, llm_name = await _run_llm_pass(broker, job, llm_queue, categories, tags)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/dinary/dinary/src/dinary/background/classification/task.py", line 499, in _run_llm_pass
+    if outcome.broker_unavailable:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'tuple' object has no attribute 'broker_unavailable'

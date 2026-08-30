@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      <url>
+        <loc>https://andgineer.github.io/dinary/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/analytics/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/installation/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/google-sheets-setup/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/pwa-install/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/deploy-oracle/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/deploy-selfhost/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/cloudflare-setup/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/operations/</loc>
+      </url>
+      <url>
+        <loc>https://andgineer.github.io/dinary/development/</loc>
+      </url>
+</urlset>

@@ -1,0 +1,19 @@
+
+rclone config failed on the replica. Common causes:
+  * a regular Yandex account password was used instead of
+    an APP-PASSWORD. Yandex WebDAV accepts only app-
+    passwords from https://id.yandex.ru/security/app-passwords
+    (even on accounts without 2FA).
+  * the app-password was created for a category other than
+    "Files" (Файлы / WebDAV) — e.g. "Mail" tokens are
+    scoped differently and the WebDAV endpoint rejects them.
+  * the login was a display name or email (e.g. "Joe Doe",
+    "joe@yandex.ru") instead of the bare Yandex login.
+  * the app-password was mistyped (it is usually shown as
+    4 blocks of 4 letters; paste WITHOUT spaces).
+  * the replica cannot reach https://webdav.yandex.ru.
+
+The partially-created 'yandex:' remote has been rolled
+back on VM2.
+Re-run `inv setup-replica` to try again; it will
+prompt for credentials fresh.

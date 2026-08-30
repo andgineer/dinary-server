@@ -1,0 +1,3 @@
+integrity_check FAILED on dinary-2026-04-22T0317Z.db.zst; data/dinary.db NOT touched.
+  stdout: (empty)
+  stderr: Error: in prepare, file is not a database (26)

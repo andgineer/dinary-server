@@ -1,0 +1,17 @@
+ERROR    dinary.background.sheet_logging.sheet_logging:sheet_logging.py:527 Failed to open the logging sheet; skipping sweep
+Traceback (most recent call last):
+  File "/home/runner/work/dinary/dinary/src/dinary/background/sheet_logging/sheet_logging.py", line 525, in drain_pending
+    view = _open_sheet_view(spreadsheet_id)
+  File "/home/runner/work/dinary/dinary/src/dinary/background/sheet_logging/sheet_logging.py", line 208, in _open_sheet_view
+    ws = get_sheet(spreadsheet_id).sheet1
+         ~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/unittest/mock.py", line 1169, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/unittest/mock.py", line 1173, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.13.15/x64/lib/python3.13/unittest/mock.py", line 1234, in _execute_mock_call
+    raise effect
+gspread.exceptions.APIError: APIError: [429]: Quota exceeded
+WARNING  dinary.background.sheet_logging.sheet_logging:sheet_logging.py:153 Circuit breaker: backoff for 60s
