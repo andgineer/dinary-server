@@ -84,8 +84,8 @@ def _seed_catalog(conn):
 
 def _seed_receipt(conn, name_raw="hleb"):
     conn.execute(
-        "INSERT INTO receipts (client_receipt_id, url, parsed_at)"
-        " VALUES ('r1', 'https://x', '2026-05-01T10:00:00')"
+        "INSERT INTO receipts (client_receipt_id, url, parsed_at, total_amount)"
+        " VALUES ('r1', 'https://x', '2026-05-01T10:00:00', 120.0)"
     )
     receipt_id = int(conn.execute("SELECT last_insert_rowid()").fetchone()[0])
     conn.execute(
@@ -318,7 +318,7 @@ class TestClassifyAndPersist:
 
         assert exp_count == 1
 
-    def test_journal_penalty_reduces_confidence(self, conn):
+    def test_journal_source_does_not_reduce_confidence(self, conn):
         _seed_catalog(conn)
         receipt_id = _seed_receipt(conn)
         conn.execute("UPDATE receipts SET used_journal_fallback = 1 WHERE id = ?", [receipt_id])
@@ -351,7 +351,7 @@ class TestClassifyAndPersist:
         finally:
             conn2.close()
 
-        assert exp[0] == 2  # 3 - 1 journal penalty
+        assert exp[0] == 3
 
     def test_llm_rule_created_for_high_confidence(self, conn):
         _seed_catalog(conn)
@@ -692,6 +692,15 @@ class TestLoadTopFallbackCategories:
         result = _load_top_fallback_categories(6)
 
         assert result == [1, 2, 3, 4, 5, 6]
+
+    def test_returns_only_visible_category_for_single_category_request(self, conn):
+        conn.execute(
+            "INSERT INTO category_groups (id, name, sort_order, is_active) VALUES (1, 'G', 1, 1)"
+        )
+        conn.execute("INSERT INTO categories (id, name, group_id) VALUES (1, 'only', 1)")
+        conn.close()
+
+        assert _load_top_fallback_categories(1) == [1]
 
     def test_returns_top_history_then_pads(self, conn):
         conn.execute(

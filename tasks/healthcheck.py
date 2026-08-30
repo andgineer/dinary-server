@@ -18,9 +18,9 @@ from tasks.ssh_utils import (
     ssh_replica_capture_bytes,
 )
 
-# A journal fallback alerts for this long, then stops — the metadata row stays
-# as an audit record, but a one-off degradation must not fail every later run.
-FALLBACK_ALERT_WINDOW = _timedelta(hours=24)
+# A journal validation failure alerts for this long, then stops. The metadata
+# row remains as an audit record without failing every later healthcheck.
+JOURNAL_VALIDATION_ALERT_WINDOW = _timedelta(hours=24)
 
 
 def _healthcheck_run_queries(c, prod: bool, **queries: str) -> dict[str, str]:  # noqa: ARG001
@@ -259,31 +259,42 @@ def _healthcheck_receipt_queue(results: dict[str, str]) -> bool:
     return False
 
 
-def _fallback_is_recent(fallback: str, now: _datetime) -> bool:
-    stamp = fallback.split("|", 1)[0].strip()
+def _validation_failure_is_recent(failure: str, now: _datetime) -> bool:
+    stamp = failure.split("|", 1)[0].strip()
     try:
         when = _datetime.fromisoformat(stamp)
     except ValueError:
         return True  # unreadable timestamp is itself worth an alert
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)
-    return now - when <= FALLBACK_ALERT_WINDOW
+    return now - when <= JOURNAL_VALIDATION_ALERT_WINDOW
 
 
 def _healthcheck_receipt_fetch(results: dict[str, str]) -> bool:
     """Print receipt-fetch health lines. Returns True if any failure was found."""
-    fallback = results.get("receipt_fallback", "").strip()
-    count = results.get("receipt_fallback_count", "0").strip()
+    fallback_count = results.get("receipt_fallback_count", "0").strip()
+    validation_failure = results.get("receipt_journal_validation_failure", "").strip()
+    validation_failure_count = results.get(
+        "receipt_journal_validation_failure_count",
+        "0",
+    ).strip()
 
-    if count != "0":
-        print(f"OK: /specifications fallback uses, all time: {count}")
+    if fallback_count != "0":
+        print(f"OK: journal fallback uses, all time: {fallback_count}")
+    if validation_failure_count != "0":
+        print(f"OK: journal validation failures, all time: {validation_failure_count}")
 
-    if not fallback:
+    if not validation_failure:
         return False
-    if _fallback_is_recent(fallback, _datetime.now(UTC)):
-        print(f"FAIL: /specifications fallback used — {fallback}", file=sys.stderr)
+    if _validation_failure_is_recent(validation_failure, _datetime.now(UTC)):
+        print(
+            f"FAIL: journal receipt validation failed — {validation_failure}",
+            file=sys.stderr,
+        )
         return True
-    print(f"OK: last /specifications fallback older than alert window — {fallback}")
+    print(
+        f"OK: last journal validation failure older than alert window — {validation_failure}",
+    )
     return False
 
 
@@ -335,13 +346,17 @@ def healthcheck(c, prod=False):  # noqa: ARG001
             "SELECT COALESCE((SELECT value FROM app_metadata"
             " WHERE key = 'llm_provider_switch_count'), '0')"
         ),
-        receipt_fallback=(
+        receipt_journal_validation_failure=(
             "SELECT COALESCE((SELECT value FROM app_metadata"
-            " WHERE key = 'receipt_fetch_fallback_last'), '')"
+            " WHERE key = 'receipt_journal_validation_failure_last'), '')"
         ),
         receipt_fallback_count=(
             "SELECT COALESCE((SELECT value FROM app_metadata"
             " WHERE key = 'receipt_fetch_fallback_count'), '0')"
+        ),
+        receipt_journal_validation_failure_count=(
+            "SELECT COALESCE((SELECT value FROM app_metadata"
+            " WHERE key = 'receipt_journal_validation_failure_count'), '0')"
         ),
         receipt_queue=(
             "SELECT"

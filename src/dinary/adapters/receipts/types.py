@@ -44,6 +44,7 @@ class ParsedReceipt:
     total_ok: bool
     used_journal_fallback: bool = False
     purchase_datetime: str | None = None
+    journal_validation_errors: tuple[str, ...] = ()
 
 
 @dataclass(slots=True, frozen=True)

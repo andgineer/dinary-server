@@ -87,8 +87,12 @@ export const useReviewStore = defineStore("review", () => {
     try {
       const nextPage = page.value + 1;
       const data = await getReviewFeed({ page: nextPage, pageSize: 20 });
-      const existingIds = new Set(items.value.map((i) => i.id));
-      const incoming = (data.items ?? []).filter((i) => !existingIds.has(i.id));
+      const existingIds = new Set(
+        items.value.map((i) => `${i.review_kind ?? "rule"}:${i.id}`),
+      );
+      const incoming = (data.items ?? []).filter(
+        (i) => !existingIds.has(`${i.review_kind ?? "rule"}:${i.id}`),
+      );
       items.value = [...items.value, ...incoming];
       doubtfulCount.value = data.doubtful_count ?? doubtfulCount.value;
       const q = data.receipts_queue ?? { ..._emptyQueue };
@@ -117,7 +121,10 @@ export const useReviewStore = defineStore("review", () => {
     const catalog = useCatalogStore();
     try {
       let result;
-      if (item.is_doubtful) {
+      const isExpenseCorrection = item.review_kind === "expense_correction";
+      if (isExpenseCorrection) {
+        result = await correctCategory(item.expense_id ?? item.id, categoryId, "single");
+      } else if (item.is_doubtful) {
         result = await approveRule(item.id, categoryId);
       } else {
         const expenseId = item.expense_id ?? item.id;
@@ -127,7 +134,11 @@ export const useReviewStore = defineStore("review", () => {
       const cat = catalog.findCategoryById(categoryId);
       const catName = cat?.name ?? "";
       if (item.is_doubtful) {
-        items.value = items.value.filter((i) => i.id !== item.id);
+        items.value = items.value.filter(
+          (i) =>
+            i.id !== item.id ||
+            (i.review_kind ?? "rule") !== (item.review_kind ?? "rule"),
+        );
         doubtfulCount.value = Math.max(0, doubtfulCount.value - 1);
       } else {
         const idx = items.value.findIndex((i) => i.id === item.id);
@@ -139,14 +150,24 @@ export const useReviewStore = defineStore("review", () => {
           };
         }
       }
-      expenses.value = expenses.value.map((e) =>
-        e.rule_id === item.id
-          ? { ...e, category_id: categoryId, category_name: catName, confidence_level: null }
-          : e,
-      );
+      if (isExpenseCorrection) {
+        const expenseId = item.expense_id ?? item.id;
+        expenses.value = expenses.value.map((e) =>
+          e.id === expenseId
+            ? { ...e, category_id: categoryId, category_name: catName, confidence_level: 4 }
+            : e,
+        );
+      } else {
+        expenses.value = expenses.value.map((e) =>
+          e.rule_id === item.id
+            ? { ...e, category_id: categoryId, category_name: catName, confidence_level: null }
+            : e,
+        );
+      }
       _persistExpenses();
       _persistState();
-      toast.show(`Updated ${count} expenses → ${catName} · rule saved`, "success");
+      const suffix = isExpenseCorrection ? "" : " · rule saved";
+      toast.show(`Updated ${count} expenses → ${catName}${suffix}`, "success");
     } catch (err) {
       toast.show(err?.message || "Correction failed", "error");
     }
@@ -161,7 +182,9 @@ export const useReviewStore = defineStore("review", () => {
     try {
       const result = await confirmAllRules(ruleIds);
       const confirmedCount = result?.confirmed ?? ruleIds.length;
-      items.value = items.value.filter((i) => !ruleIds.includes(i.id));
+      items.value = items.value.filter(
+        (i) => i.review_kind === "expense_correction" || !ruleIds.includes(i.id),
+      );
       doubtfulCount.value = Math.max(0, doubtfulCount.value - confirmedCount);
       _persistState();
       resetExpenses();
@@ -216,13 +239,38 @@ export const useReviewStore = defineStore("review", () => {
     const toast = useToastStore();
     try {
       await editExpense(id, payload);
-      if (payload.update_rule) {
-        const removed = items.value.filter((i) => i.expense_id === id && i.is_doubtful);
+      const confirmsCorrection =
+        payload.category_id != null &&
+        items.value.some(
+          (i) =>
+            i.review_kind === "expense_correction" &&
+            (i.expense_id ?? i.id) === id,
+        );
+      if (payload.update_rule || confirmsCorrection) {
+        const removed = items.value.filter(
+          (i) =>
+            (i.expense_id ?? i.id) === id &&
+            i.is_doubtful &&
+            (payload.update_rule || i.review_kind === "expense_correction"),
+        );
         if (removed.length > 0) {
-          items.value = items.value.filter((i) => !(i.expense_id === id && i.is_doubtful));
+          const removedKeys = new Set(
+            removed.map((i) => `${i.review_kind ?? "rule"}:${i.id}`),
+          );
+          items.value = items.value.filter(
+            (i) => !removedKeys.has(`${i.review_kind ?? "rule"}:${i.id}`),
+          );
           doubtfulCount.value = Math.max(0, doubtfulCount.value - removed.length);
           _persistState();
         }
+      }
+      if (confirmsCorrection) {
+        expenses.value = expenses.value.map((e) =>
+          e.id === id ? { ...e, confidence_level: 4 } : e,
+        );
+        _persistExpenses();
+      }
+      if (payload.update_rule) {
         const target = expenses.value.find((e) => e.id === id);
         if (target?.rule_id != null) {
           const patch = { confidence_level: null };

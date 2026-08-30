@@ -14,6 +14,9 @@ const { isOnline } = useOnline();
 const toast = useToastStore();
 
 const doubtfulItems = computed(() => reviewStore.items.filter((i) => i.is_doubtful));
+const doubtfulRules = computed(() =>
+  doubtfulItems.value.filter((i) => i.review_kind !== "expense_correction"),
+);
 
 const groupedExpenses = computed(() => {
   const result = [];
@@ -63,6 +66,14 @@ function openExpenseEdit(expense, suggestions = [], ruleItem = null) {
   expenseEditOpen.value = true;
 }
 
+function openReviewItem(item) {
+  if (item.review_kind === "expense_correction") {
+    openExpenseEdit(item);
+    return;
+  }
+  openExpenseEdit(null, item.alternative_categories ?? [], item);
+}
+
 function closeExpenseEdit() {
   expenseEditOpen.value = false;
   editingExpense.value = null;
@@ -78,7 +89,7 @@ async function approveItem({ item, categoryId }) {
 
 async function handleConfirmAll() {
   if (!navigator.onLine) { toast.show("Not available offline", "info"); return; }
-  const ruleIds = doubtfulItems.value.map((i) => i.id);
+  const ruleIds = doubtfulRules.value.map((i) => i.id);
   await reviewStore.confirmAll(ruleIds);
   window.dispatchEvent(new Event("online"));
 }
@@ -263,10 +274,10 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <template v-for="item in reviewStore.items" :key="item.id">
+    <template v-for="item in reviewStore.items" :key="`${item.review_kind ?? 'rule'}:${item.id}`">
       <RuleRow
         :item="item"
-        @tap="openExpenseEdit(null, item.alternative_categories ?? [], item)"
+        @tap="openReviewItem(item)"
         @approve="approveItem($event)"
       />
     </template>
@@ -279,7 +290,7 @@ onBeforeUnmount(() => {
     <div ref="rulesSentinel" class="scroll-sentinel" aria-hidden="true" />
 
     <div
-      v-if="!reviewStore.hasMore && !reviewStore.loading && doubtfulItems.length > 0"
+      v-if="!reviewStore.hasMore && !reviewStore.loading && doubtfulRules.length > 0"
       class="confirm-all-wrap"
     >
       <button
@@ -288,7 +299,7 @@ onBeforeUnmount(() => {
         data-testid="confirm-all-btn"
         @click="handleConfirmAll"
       >
-        Confirm all ({{ doubtfulItems.length }})
+        Confirm all ({{ doubtfulRules.length }})
       </button>
     </div>
 

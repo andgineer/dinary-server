@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import allure
@@ -177,6 +178,32 @@ class TestParseReceiptFallback:
         with patch("dinary.adapters.receipts.serbian.httpx.AsyncClient", return_value=ctx):
             receipt = asyncio.run(parse_receipt("https://suf.purs.gov.rs/v/?vl=test"))
         assert len(receipt.items) == 3
+        assert receipt.journal_validation_errors == ()
+
+    def test_logs_warning_when_valid_journal_is_used(self, caplog):
+        ctx, _ = _mock_async_client(_JSON_RESPONSE, _HTML_WITH_TOKEN, _SPECS_EMPTY)
+        with (
+            caplog.at_level(logging.WARNING),
+            patch("dinary.adapters.receipts.serbian.httpx.AsyncClient", return_value=ctx),
+        ):
+            asyncio.run(parse_receipt("https://suf.purs.gov.rs/v/?vl=test"))
+
+        assert "Using journal fallback" in caplog.text
+        assert "validation passed" in caplog.text
+
+    def test_total_mismatch_is_journal_validation_error(self):
+        bad = {
+            **_JSON_RESPONSE,
+            "invoiceResult": {"totalAmount": 999.99, "invoiceNumber": "TEST-TEST-001"},
+        }
+        ctx, _ = _mock_async_client(bad, _HTML_WITH_TOKEN, _SPECS_EMPTY)
+        with patch("dinary.adapters.receipts.serbian.httpx.AsyncClient", return_value=ctx):
+            receipt = asyncio.run(parse_receipt("https://suf.purs.gov.rs/v/?vl=test"))
+
+        assert receipt.total_ok is False
+        assert receipt.journal_validation_errors == (
+            "item total 974.76 does not match receipt total 999.99",
+        )
 
     def test_falls_back_when_token_missing(self):
         ctx, _ = _mock_async_client(_JSON_RESPONSE, "<html>no token</html>", _SPECS_RESPONSE)
@@ -216,21 +243,88 @@ class TestParseReceiptFallback:
 @allure.story("Receipt parser")
 class TestParseJournal:
     def test_kg_item_decimal_quantity(self):
-        items = _parse_journal(_JOURNAL_WITH_KG)
+        items, errors = _parse_journal(_JOURNAL_WITH_KG)
         grejpfrut = next(i for i in items if "Grejpfrut" in i.name_raw)
         assert grejpfrut.quantity == pytest.approx(2.6)
         assert grejpfrut.total_price == pytest.approx(454.97)
+        assert errors == ()
 
     def test_no_items_merged(self):
-        items = _parse_journal(_JOURNAL_WITH_KG)
+        items, _ = _parse_journal(_JOURNAL_WITH_KG)
         assert len(items) == 3
 
     def test_all_items_present(self):
-        items = _parse_journal(_JOURNAL_WITH_KG)
+        items, _ = _parse_journal(_JOURNAL_WITH_KG)
         names = [i.name_raw for i in items]
         assert any("Grejpfrut" in n for n in names)
         assert any("Mesnata" in n for n in names)
         assert any("Karamel" in n for n in names)
+
+    def test_reports_malformed_value_line(self):
+        journal = _JOURNAL_WITH_KG.replace(
+            "       819,99      0,440          360,80",
+            "       malformed values",
+        )
+
+        items, errors = _parse_journal(journal)
+
+        assert len(items) == 2
+        assert errors == ("malformed value line for item 'Mesnata slanina/KG/0227734 (Ђ)'",)
+
+    def test_reports_extra_value_column(self):
+        journal = _JOURNAL_WITH_KG.replace(
+            "       819,99      0,440          360,80",
+            "       819,99      0,440          360,80      unexpected",
+        )
+
+        items, errors = _parse_journal(journal)
+
+        assert len(items) == 2
+        assert errors == ("malformed value line for item 'Mesnata slanina/KG/0227734 (Ђ)'",)
+
+    def test_reports_non_finite_value(self):
+        journal = _JOURNAL_WITH_KG.replace(
+            "       819,99      0,440          360,80",
+            "       nan         0,440          360,80",
+        )
+
+        items, errors = _parse_journal(journal)
+
+        assert len(items) == 2
+        assert errors == ("malformed value line for item 'Mesnata slanina/KG/0227734 (Ђ)'",)
+
+    def test_reports_item_arithmetic_mismatch(self):
+        journal = _JOURNAL_WITH_KG.replace(
+            "       819,99      0,440          360,80",
+            "       819,99      0,440          350,80",
+        )
+
+        items, errors = _parse_journal(journal)
+
+        assert len(items) == 3
+        assert errors == (
+            "item arithmetic mismatch for 'Mesnata slanina/KG/0227734 (Ђ)': "
+            "819.99 * 0.44 = 360.80, journal has 350.80",
+        )
+
+    def test_reports_missing_value_line(self):
+        journal = _JOURNAL_WITH_KG.replace(
+            "       819,99      0,440          360,80\n",
+            "",
+        )
+
+        items, errors = _parse_journal(journal)
+
+        assert len(items) == 2
+        assert errors == ("missing value line for item 'Mesnata slanina/KG/0227734 (Ђ)'",)
+
+    def test_reports_missing_section_terminator(self):
+        journal = _JOURNAL_WITH_KG.split("----------------------------------------", 1)[0]
+
+        items, errors = _parse_journal(journal)
+
+        assert len(items) == 3
+        assert errors == ("item section terminator not found",)
 
 
 @allure.epic("Receipts")

@@ -18,6 +18,7 @@ from dinary.background.classification.receipt_classifier import (
     ClassificationResult,
     ClassifyOutcome,
 )
+from dinary.background.classification.persist import JOURNAL_CORRECTION_COMMENT
 import llmbroker
 import httpx
 
@@ -293,18 +294,16 @@ class TestProcessJobEdgeCases:
         assert exp is not None
         assert str(exp[0]).startswith("2026-01-15 09:30")
 
-    def test_fallback_metadata_cleared_on_successful_parse(self, drain_db):  # noqa: ARG002
-        """_save_parsed clears fallback metadata when /specifications succeeds."""
+    def test_valid_journal_records_usage_without_validation_failure(
+        self,
+        drain_db,  # noqa: ARG002
+    ):
         conn = storage.get_connection()
         try:
             conn.execute(
                 "INSERT INTO receipts (client_receipt_id, url) VALUES ('fb-r1', 'https://x')"
             )
             receipt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-            conn.execute(
-                "INSERT INTO app_metadata (key, value)"
-                " VALUES ('receipt_fetch_fallback_last', '2026-05-01 | invoice: X | reason: timeout')"
-            )
             conn.execute(
                 "INSERT INTO app_metadata (key, value) VALUES ('receipt_fetch_fallback_count', '3')"
             )
@@ -323,14 +322,15 @@ class TestProcessJobEdgeCases:
             ],
             items_total=80.0,
             total_ok=True,
-            used_journal_fallback=False,
+            used_journal_fallback=True,
         )
         _save_parsed(receipt_id, parsed)
 
         conn = storage.get_connection()
         try:
-            last = conn.execute(
-                "SELECT value FROM app_metadata WHERE key = 'receipt_fetch_fallback_last'"
+            failure = conn.execute(
+                "SELECT value FROM app_metadata"
+                " WHERE key = 'receipt_journal_validation_failure_last'"
             ).fetchone()
             count = conn.execute(
                 "SELECT value FROM app_metadata WHERE key = 'receipt_fetch_fallback_count'"
@@ -338,10 +338,56 @@ class TestProcessJobEdgeCases:
         finally:
             conn.close()
 
-        assert last is None, "fallback_last should be cleared after successful parse"
-        assert count is not None and count[0] == "3", (
-            "fallback_count persists as a cumulative audit counter"
+        assert failure is None
+        assert count is not None and count[0] == "4"
+
+    def test_invalid_journal_records_validation_failure(self, drain_db):  # noqa: ARG002
+        conn = storage.get_connection()
+        try:
+            conn.execute(
+                "INSERT INTO receipts (client_receipt_id, url) VALUES ('bad-journal', 'https://x')"
+            )
+            receipt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        finally:
+            conn.close()
+
+        parsed = ParsedReceipt(
+            store_name="Maxi",
+            store_pib="200",
+            total_amount=80.0,
+            invoice_number="INV-BAD",
+            items=[
+                ReceiptItem(
+                    name_raw="HLEB", unit_price=70.0, quantity=1.0, total_price=70.0, tax_label=""
+                )
+            ],
+            items_total=70.0,
+            total_ok=False,
+            used_journal_fallback=True,
         )
+        _save_parsed(receipt_id, parsed)
+
+        conn = storage.get_connection()
+        try:
+            failure = conn.execute(
+                "SELECT value FROM app_metadata"
+                " WHERE key = 'receipt_journal_validation_failure_last'"
+            ).fetchone()
+            failure_count = conn.execute(
+                "SELECT value FROM app_metadata"
+                " WHERE key = 'receipt_journal_validation_failure_count'"
+            ).fetchone()
+            fallback_count = conn.execute(
+                "SELECT value FROM app_metadata WHERE key = 'receipt_fetch_fallback_count'"
+            ).fetchone()
+        finally:
+            conn.close()
+
+        assert failure is not None
+        assert "INV-BAD" in failure[0]
+        assert "item total 70.00 does not match receipt total 80.00" in failure[0]
+        assert failure_count is not None and failure_count[0] == "1"
+        assert fallback_count is not None and fallback_count[0] == "1"
 
     def test_expense_datetime_uses_purchase_datetime_when_set(self, drain_db):  # noqa: ARG002
         """Expenses use purchase_datetime from the receipt when present, not created_at."""
@@ -572,8 +618,7 @@ class TestProcessJobEdgeCases:
 
         mock_wakeup.assert_called_once_with(86400)
 
-    def test_conf1_items_after_journal_penalty_creates_expense(self, drain_db):  # noqa: ARG002
-        """When journal penalty reduces LLM conf=2 to conf=1, expense is still created."""
+    def test_valid_journal_keeps_llm_confidence(self, drain_db):  # noqa: ARG002
         parsed = ParsedReceipt(
             store_name="Lidl",
             store_pib="100",
@@ -590,7 +635,7 @@ class TestProcessJobEdgeCases:
             ],
             items_total=50.0,
             total_ok=True,
-            used_journal_fallback=True,  # journal penalty: −1
+            used_journal_fallback=True,
         )
         conn = storage.get_connection()
         try:
@@ -625,7 +670,6 @@ class TestProcessJobEdgeCases:
             claim_token="tok",
         )
 
-        # LLM returns cat=1 conf=2; journal penalty (−1) → final conf=1; expense IS created
         with (
             patch("dinary.background.classification.task.parse_receipt", return_value=parsed),
             patch(
@@ -646,6 +690,9 @@ class TestProcessJobEdgeCases:
             exp_count = conn.execute(
                 "SELECT COUNT(*) FROM expenses WHERE receipt_id = ?", [receipt_id]
             ).fetchone()[0]
+            confidence = conn.execute(
+                "SELECT confidence_level FROM expenses WHERE receipt_id = ?", [receipt_id]
+            ).fetchone()[0]
             job_row = conn.execute(
                 "SELECT status FROM receipt_classification_jobs WHERE receipt_id = ?",
                 [receipt_id],
@@ -653,8 +700,186 @@ class TestProcessJobEdgeCases:
         finally:
             conn.close()
 
-        assert exp_count == 1, "conf=1 items with valid category must generate an expense"
+        assert exp_count == 1
+        assert confidence == 2
         assert job_row is None, "job must be completed (deleted) after creating expense"
+
+    def test_journal_shortfall_adds_correction_expense(self, drain_db):  # noqa: ARG002
+        parsed = ParsedReceipt(
+            store_name="Lidl",
+            store_pib="100",
+            total_amount=80.0,
+            invoice_number="INV-SHORT",
+            items=[
+                ReceiptItem(
+                    name_raw="HLEB",
+                    unit_price=70.0,
+                    quantity=1.0,
+                    total_price=70.0,
+                    tax_label="",
+                )
+            ],
+            items_total=70.0,
+            total_ok=False,
+            used_journal_fallback=True,
+        )
+        conn = storage.get_connection()
+        try:
+            _seed_drain_db(conn)
+            conn.execute("INSERT INTO categories (id, name, group_id) VALUES (2, 'common', 1)")
+            for index in range(3):
+                conn.execute(
+                    "INSERT INTO expenses"
+                    " (client_expense_id, datetime, amount, amount_original, currency_original,"
+                    "  category_id)"
+                    " VALUES (?, datetime('now'), 1, 1, 'RSD', 2)",
+                    [f"history-{index}"],
+                )
+            conn.execute("INSERT INTO shop_chains (name) VALUES ('Lidl')")
+            chain_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute(
+                "INSERT INTO stores (name, chain_id, pib) VALUES ('Lidl', ?, '100')",
+                [chain_id],
+            )
+            conn.execute(
+                "INSERT INTO receipts (client_receipt_id, url) VALUES ('short-r1', 'https://x')"
+            )
+            receipt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute(
+                "INSERT INTO receipt_classification_jobs (receipt_id) VALUES (?)",
+                [receipt_id],
+            )
+        finally:
+            conn.close()
+
+        job = ReceiptJobRow(
+            receipt_id=receipt_id,
+            url="https://x",
+            store_name_raw="",
+            store_pib_raw="",
+            invoice_number="",
+            parsed_at=None,
+            used_journal_fallback=False,
+            claim_token="tok",
+        )
+        with (
+            patch("dinary.background.classification.task.parse_receipt", return_value=parsed),
+            patch(
+                "dinary.background.classification.task.classify_receipt",
+                return_value=_make_classify_outcome(
+                    [
+                        ClassificationResult(
+                            item_name_normalized="hleb",
+                            category_id=1,
+                            confidence_level=3,
+                        )
+                    ]
+                ),
+            ),
+        ):
+            asyncio.run(_process_job(job, _make_broker()))
+
+        conn = storage.get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT amount_original, category_id, confidence_level, comment"
+                " FROM expenses WHERE receipt_id = ? ORDER BY id",
+                [receipt_id],
+            ).fetchall()
+        finally:
+            conn.close()
+
+        assert [float(row[0]) for row in rows] == [70.0, 10.0]
+        assert sum(float(row[0]) for row in rows) == 80.0
+        assert rows[1][1] == 2
+        assert rows[1][2] == 1
+        assert rows[1][3] == JOURNAL_CORRECTION_COMMENT
+
+    def test_journal_excess_replaces_items_with_full_correction(self, drain_db):  # noqa: ARG002
+        parsed = ParsedReceipt(
+            store_name="Lidl",
+            store_pib="100",
+            total_amount=80.0,
+            invoice_number="INV-EXCESS",
+            items=[
+                ReceiptItem(
+                    name_raw="BAD ITEM",
+                    unit_price=90.0,
+                    quantity=1.0,
+                    total_price=90.0,
+                    tax_label="",
+                )
+            ],
+            items_total=90.0,
+            total_ok=False,
+            used_journal_fallback=True,
+        )
+        conn = storage.get_connection()
+        try:
+            _seed_drain_db(conn)
+            conn.execute("INSERT INTO categories (id, name, group_id) VALUES (2, 'common', 1)")
+            for index in range(3):
+                conn.execute(
+                    "INSERT INTO expenses"
+                    " (client_expense_id, datetime, amount, amount_original, currency_original,"
+                    "  category_id)"
+                    " VALUES (?, datetime('now'), 1, 1, 'RSD', 2)",
+                    [f"history-{index}"],
+                )
+            conn.execute("INSERT INTO shop_chains (name) VALUES ('Lidl')")
+            chain_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute(
+                "INSERT INTO stores (name, chain_id, pib) VALUES ('Lidl', ?, '100')",
+                [chain_id],
+            )
+            conn.execute(
+                "INSERT INTO receipts (client_receipt_id, url) VALUES ('excess-r1', 'https://x')"
+            )
+            receipt_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute(
+                "INSERT INTO receipt_classification_jobs (receipt_id) VALUES (?)",
+                [receipt_id],
+            )
+        finally:
+            conn.close()
+
+        job = ReceiptJobRow(
+            receipt_id=receipt_id,
+            url="https://x",
+            store_name_raw="",
+            store_pib_raw="",
+            invoice_number="",
+            parsed_at=None,
+            used_journal_fallback=False,
+            claim_token="tok",
+        )
+        with (
+            patch("dinary.background.classification.task.parse_receipt", return_value=parsed),
+            patch("dinary.background.classification.task.classify_receipt") as classify_mock,
+        ):
+            asyncio.run(_process_job(job, _make_broker()))
+
+        conn = storage.get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT amount_original, category_id, confidence_level, comment"
+                " FROM expenses WHERE receipt_id = ?",
+                [receipt_id],
+            ).fetchall()
+            item_count = conn.execute(
+                "SELECT COUNT(*) FROM receipt_items WHERE receipt_id = ?",
+                [receipt_id],
+            ).fetchone()[0]
+        finally:
+            conn.close()
+
+        classify_mock.assert_not_called()
+        assert item_count == 0
+        assert len(rows) == 1
+        assert float(rows[0][0]) == 80.0
+        assert rows[0][1] == 2
+        assert rows[0][2] == 1
+        assert rows[0][3] == JOURNAL_CORRECTION_COMMENT
 
 
 # ---------------------------------------------------------------------------

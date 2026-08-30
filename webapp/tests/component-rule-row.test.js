@@ -167,6 +167,33 @@ describe("RuleRow — doubtful row", () => {
   });
 });
 
+describe("RuleRow — journal correction totals", () => {
+  it("shows both the correction amount and the full receipt total", () => {
+    const w = mount(RuleRow, {
+      props: {
+        item: makeDoubtful({
+          review_kind: "expense_correction",
+          total: 150,
+          receipt_total: 1250,
+          currency: "RSD",
+        }),
+      },
+    });
+
+    expect(w.get('[data-testid="correction-amount"]').text()).toContain("150 RSD");
+    expect(w.get('[data-testid="receipt-total"]').text()).toContain("1,250 RSD");
+  });
+
+  it("does not add correction totals to a normal doubtful rule", () => {
+    const w = mount(RuleRow, {
+      props: { item: makeDoubtful({ total: 150, receipt_total: 1250, currency: "RSD" }) },
+    });
+
+    expect(w.find('[data-testid="correction-amount"]').exists()).toBe(false);
+    expect(w.find('[data-testid="receipt-total"]').exists()).toBe(false);
+  });
+});
+
 describe("RuleRow — confidence-coloured borders", () => {
   it("confidence 1 gets row-wrap--c1 class", () => {
     const w = mount(RuleRow, { props: { item: makeDoubtful({ confidence_level: 1 }) } });

@@ -47,6 +47,9 @@ const SCOPE_OPTIONS = [
 const source = computed(() => props.expense ?? props.ruleItem);
 const isManual = computed(() => props.expense?.receipt_id == null);
 const isReceiptBacked = computed(() => props.expense?.receipt_id != null);
+const isCorrection = computed(
+  () => props.expense?.review_kind === "expense_correction",
+);
 
 const {
   confirmingDelete,
@@ -104,10 +107,21 @@ const visibleEvents = computed(() => {
   return ev ? [ev, ...active] : active;
 });
 
-const showScope = computed(() => props.expense?.receipt_id != null);
+const showScope = computed(
+  () =>
+    props.expense?.receipt_id != null &&
+    props.expense?.review_kind !== "expense_correction",
+);
 const showUpdateRule = computed(
   () => props.expense?.receipt_id != null && props.expense?.has_rule === true,
 );
+
+function formatMoney(value, currency) {
+  const amountValue = Number(value);
+  if (!Number.isFinite(amountValue)) return "—";
+  const formatted = amountValue.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return `${formatted} ${currency ?? ""}`.trim();
+}
 
 function toggleTag(tagId) {
   const id = Number(tagId);
@@ -230,6 +244,25 @@ function onReceiptResolved() {
         v-model:amount="amount"
         v-model:currency="selectedCurrency"
       />
+    </div>
+
+    <div
+      v-if="isCorrection"
+      class="field-block correction-summary"
+      data-testid="correction-summary"
+    >
+      <div class="summary-row">
+        <span class="field-label">CORRECTION AMOUNT</span>
+        <strong data-testid="correction-summary-amount">
+          {{ formatMoney(expense.amount_original, expense.currency_original) }}
+        </strong>
+      </div>
+      <div class="summary-row">
+        <span class="field-label">RECEIPT TOTAL</span>
+        <strong data-testid="correction-summary-receipt-total">
+          {{ formatMoney(expense.receipt_total, expense.currency_original) }}
+        </strong>
+      </div>
     </div>
 
     <!-- Category -->
@@ -410,6 +443,26 @@ function onReceiptResolved() {
 
 .field-block {
   margin-bottom: 1.25rem;
+}
+
+.correction-summary {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--warning);
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.07);
+}
+
+.summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.summary-row .field-label {
+  margin: 0;
 }
 
 .field-label {

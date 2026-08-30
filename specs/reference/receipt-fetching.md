@@ -27,8 +27,74 @@ Structured item data is fetched via two paths, with automatic fallback:
 
 The primary path requires a session token embedded in the receipt's HTML page,
 which adds an extra HTTP request. If the token cannot be extracted or the
-structured endpoint is unavailable, the pipeline falls silently to the journal
-parser.
+structured endpoint is unavailable, the pipeline uses the journal parser. Every
+such use is logged at warning level so the behaviour remains observable, but the
+fallback alone is not a healthcheck failure.
+
+### Journal validation and operational status
+
+The journal parser validates its coverage of the item section while parsing it:
+
+- every item-name line must have one following numeric value line;
+- every value line must contain exactly three finite numeric fields: unit price,
+  quantity, and item total;
+- value lines without an item name and malformed numeric lines are reported;
+- each item total must equal unit price multiplied by quantity within `0.02` RSD;
+- the item section must have its normal terminator;
+- at least one item must be recovered; and
+- the sum of recovered item totals must match `invoiceResult.totalAmount` within
+  `0.02` RSD.
+
+A journal result that passes these checks is equivalent to a `/specifications`
+result for Dinary's accounting and classification inputs. It is classified
+without a confidence penalty and does not fail the healthcheck. The cumulative
+journal-fallback counter remains available as informational telemetry.
+
+A journal result that recovers at least one item but has structural or
+total-validation errors still produces expenses so a receipt is not silently
+discarded. If the recovered item total is below the official receipt total, the
+recovered items are retained and the difference becomes a correction expense.
+If the recovered item total exceeds the official total, all recovered items are
+discarded and the entire official total becomes one correction expense. The
+correction uses the most frequently used visible category from the last three
+months, has confidence level 1, and carries the comment
+`"Коррекция в результате ошибки обработки чека"`.
+
+Every correction expense appears in `NEEDS REVIEW` until the user explicitly
+chooses or confirms its category. Corrections are excluded from `Confirm all`.
+The review row and edit sheet show both the correction amount and the official
+receipt total so the discrepancy is visible before confirmation.
+Confirming one updates only that expense: it has no receipt item or classification
+rule, so the selected category is never learned as a future item/store rule.
+
+Validation details are stored in `app_metadata` in both mismatch cases. If no
+item can be recovered, the existing transient retry path remains in effect. A
+recent validation failure makes the healthcheck fail; the mere absence of
+`/specifications` does not.
+
+### Production timing observation (2026-08-29)
+
+A read-only review covered 167 Serbian production receipts. Twelve had used the
+journal fallback, and all twelve recovered item totals exactly matched the
+official receipt total. Re-fetching one of those receipts after
+`/specifications` became available produced the same normalized item names,
+prices, quantities, and totals; only item order differed.
+
+The failed `/specifications` attempts occurred when receipts were 30.6 to 117.3
+seconds old, with a median of about 54 seconds. Comparison by fiscal-terminal
+prefix did not establish a deterministic readiness delay. For 11 fallback
+observations with a later successful observation from the same terminal, the
+nearest higher successful receipt age differed by at most 3 seconds in 7 cases,
+10 seconds in 10 cases, and 27 seconds in all 11 cases. These are different
+receipts, not longitudinal retries of the same receipt. Several terminals also
+had successful younger receipts followed by an older fallback; one terminal had
+a successful observation at 87.2 seconds and a fallback at 117.3 seconds.
+
+Consequently, this dataset does not justify adding a wait or a store-specific
+retry delay. It supports treating an empty `/specifications` response as
+observable but not erroneous when the journal result validates. A future retry
+policy must first collect longitudinal timing for repeated requests of the same
+receipt.
 
 ## Montenegro — single verification call
 
@@ -45,8 +111,10 @@ non-browser clients, so requests present a browser-like User-Agent.
 
 After parsing, item totals are compared to the receipt's declared total. A
 mismatch above a small tolerance sets a flag and logs a warning, but
-classification proceeds. Blocking on a mismatch would silently discard receipts
-where the fiscal device or our parser has a minor rounding difference.
+classification proceeds. For a journal result, the mismatch is also a journal
+validation failure reported by the healthcheck. Blocking on a mismatch would
+silently discard receipts where the fiscal device or our parser has a minor
+rounding difference.
 
 ## Server unreliability and not-yet-indexed receipts
 

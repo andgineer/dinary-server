@@ -103,48 +103,84 @@ class TestHealthcheckReceiptQueue:
 @allure.feature("Admin")
 class TestHealthcheckReceiptFetch:
     def test_ok_when_all_clear(self):
-        results = {"receipt_fallback": "", "receipt_fallback_count": "0"}
+        results = {
+            "receipt_fallback_count": "0",
+            "receipt_journal_validation_failure": "",
+            "receipt_journal_validation_failure_count": "0",
+        }
         assert _healthcheck_receipt_fetch(results) is False
 
-    def test_fails_on_fallback(self):
+    def test_valid_journal_fallback_is_healthy(self):
         results = {
-            "receipt_fallback": f"{_ago(hours=1)} | invoice: XYZ | reason: HTTP 503",
-            "receipt_fallback_count": "1",
+            "receipt_fallback_count": "3",
+            "receipt_journal_validation_failure": "",
+            "receipt_journal_validation_failure_count": "0",
+        }
+        assert _healthcheck_receipt_fetch(results) is False
+
+    def test_fails_on_recent_journal_validation_failure(self):
+        results = {
+            "receipt_fallback_count": "3",
+            "receipt_journal_validation_failure": (
+                f"{_ago(hours=1)} | invoice: XYZ | reason: item total mismatch"
+            ),
+            "receipt_journal_validation_failure_count": "1",
         }
         assert _healthcheck_receipt_fetch(results) is True
 
-    def test_ok_when_fallback_older_than_alert_window(self):
+    def test_ok_when_validation_failure_older_than_alert_window(self):
         results = {
-            "receipt_fallback": f"{_ago(hours=49)} | invoice: XYZ | reason: HTTP 503",
-            "receipt_fallback_count": "1",
+            "receipt_journal_validation_failure": (
+                f"{_ago(hours=49)} | invoice: XYZ | reason: item total mismatch"
+            ),
+            "receipt_journal_validation_failure_count": "1",
         }
         assert _healthcheck_receipt_fetch(results) is False
 
-    def test_still_reports_stale_fallback_as_info(self, capsys):
+    def test_still_reports_stale_validation_failure_as_info(self, capsys):
         results = {
-            "receipt_fallback": f"{_ago(hours=49)} | invoice: XYZ | reason: HTTP 503",
-            "receipt_fallback_count": "1",
+            "receipt_journal_validation_failure": (
+                f"{_ago(hours=49)} | invoice: XYZ | reason: item total mismatch"
+            ),
+            "receipt_journal_validation_failure_count": "1",
         }
         _healthcheck_receipt_fetch(results)
         assert "XYZ" in capsys.readouterr().out
 
     def test_fails_on_unparseable_timestamp(self):
         results = {
-            "receipt_fallback": "not-a-date | invoice: XYZ | reason: HTTP 503",
-            "receipt_fallback_count": "1",
+            "receipt_journal_validation_failure": (
+                "not-a-date | invoice: XYZ | reason: item total mismatch"
+            ),
+            "receipt_journal_validation_failure_count": "1",
         }
         assert _healthcheck_receipt_fetch(results) is True
 
     def test_naive_timestamp_treated_as_utc(self):
         stamp = (datetime.now(UTC) - timedelta(hours=1)).replace(tzinfo=None).isoformat()
         results = {
-            "receipt_fallback": f"{stamp} | invoice: XYZ | reason: HTTP 503",
-            "receipt_fallback_count": "1",
+            "receipt_journal_validation_failure": (
+                f"{stamp} | invoice: XYZ | reason: item total mismatch"
+            ),
+            "receipt_journal_validation_failure_count": "1",
         }
         assert _healthcheck_receipt_fetch(results) is True
 
     def test_prints_fallback_count_info(self, capsys):
-        results = {"receipt_fallback": "", "receipt_fallback_count": "3"}
+        results = {
+            "receipt_fallback_count": "3",
+            "receipt_journal_validation_failure": "",
+            "receipt_journal_validation_failure_count": "0",
+        }
         _healthcheck_receipt_fetch(results)
         out = capsys.readouterr().out
         assert "3" in out
+
+    def test_prints_validation_failure_count_info(self, capsys):
+        results = {
+            "receipt_journal_validation_failure": "",
+            "receipt_journal_validation_failure_count": "2",
+        }
+        _healthcheck_receipt_fetch(results)
+        out = capsys.readouterr().out
+        assert "validation failures, all time: 2" in out

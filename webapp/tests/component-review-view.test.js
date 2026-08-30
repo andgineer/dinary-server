@@ -380,6 +380,64 @@ describe("ReviewView", () => {
     expect(confirmSpy).toHaveBeenCalledWith([FEED_PAGE_1.items[0].id]);
     wrapper.unmount();
   });
+
+  it("excludes correction expenses from confirm all", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    useCatalogStore(pinia).replaceSnapshot(CATALOG);
+    const review = useReviewStore(pinia);
+    vi.spyOn(review, "loadIfNeeded").mockImplementation(async () => {
+      review.items = [
+        FEED_PAGE_1.items[0],
+        {
+          id: 99,
+          review_kind: "expense_correction",
+          is_doubtful: true,
+          confidence_level: 1,
+          category_id: 10,
+        },
+      ];
+      review.doubtfulCount = 2;
+      review.hasMore = false;
+      review.page = 1;
+    });
+
+    const confirmSpy = vi.spyOn(review, "confirmAll").mockResolvedValue();
+    const wrapper = mountView(pinia);
+    await flushPromises();
+    await wrapper.find('[data-testid="confirm-all-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(confirmSpy).toHaveBeenCalledWith([FEED_PAGE_1.items[0].id]);
+    wrapper.unmount();
+  });
+
+  it("does not offer confirm all when only correction expenses remain", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    useCatalogStore(pinia).replaceSnapshot(CATALOG);
+    const review = useReviewStore(pinia);
+    vi.spyOn(review, "loadIfNeeded").mockImplementation(async () => {
+      review.items = [
+        {
+          id: 99,
+          review_kind: "expense_correction",
+          is_doubtful: true,
+          confidence_level: 1,
+          category_id: 10,
+        },
+      ];
+      review.doubtfulCount = 1;
+      review.hasMore = false;
+      review.page = 1;
+    });
+
+    const wrapper = mountView(pinia);
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="confirm-all-btn"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });
 
 describe("ReviewView — on-mount calls", () => {
@@ -575,6 +633,40 @@ describe("ReviewView — ExpenseEditSheet opening", () => {
     await wrapper.findComponent({ name: "RuleRow" }).vm.$emit("tap");
     await flushPromises();
     expect(wrapper.find('[data-testid="expense-edit-sheet"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("opens a correction as an expense rather than as a rule", async () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    useCatalogStore(pinia).replaceSnapshot(CATALOG);
+    const review = useReviewStore(pinia);
+    const correction = {
+      id: 99,
+      expense_id: 99,
+      review_kind: "expense_correction",
+      is_doubtful: true,
+      confidence_level: 1,
+      category_id: 10,
+      receipt_id: 7,
+      item_name: null,
+      tags: [],
+      amount_original: 50,
+      currency_original: "RSD",
+    };
+    vi.spyOn(review, "loadIfNeeded").mockImplementation(async () => {
+      review.items = [correction];
+      review.doubtfulCount = 1;
+      review.hasMore = false;
+    });
+    const wrapper = mountView(pinia);
+    await flushPromises();
+    await wrapper.findComponent({ name: "RuleRow" }).vm.$emit("tap");
+    await flushPromises();
+
+    const sheet = wrapper.findComponent({ name: "ExpenseEditSheet" });
+    expect(sheet.props("expense")).toEqual(correction);
+    expect(sheet.props("ruleItem")).toBeNull();
     wrapper.unmount();
   });
 });

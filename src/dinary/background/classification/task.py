@@ -9,6 +9,7 @@ import dataclasses
 import logging
 import sqlite3
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import httpx
 from llmbroker import AsyncBroker
@@ -22,9 +23,10 @@ from dinary.adapters.receipts.types import (
 )
 from dinary.background.classification.item_normalizer import normalize_item_name
 from dinary.background.classification.persist import (
+    PersistenceOptions,
     RateMissingError,
     persist_classification_results,
-    write_fetch_fallback_metadata,
+    record_journal_fallback,
 )
 from dinary.background.classification.receipt_classifier import (
     ClassificationResult,
@@ -243,7 +245,7 @@ async def _process_job(job: ReceiptJobRow, broker: AsyncBroker) -> None:
         store_info = await _ensure_store(job, broker)
         store_id, chain_id = store_info if store_info else (None, None)
 
-        items = await asyncio.to_thread(_get_items, job.receipt_id)
+        items = await asyncio.to_thread(_get_items, job)
         await _classify_and_persist(broker, job, items, store_id, chain_id)
         logger.info("Receipt drain: completed receipt_id=%s", job.receipt_id)
 
@@ -322,10 +324,18 @@ def _save_parsed(receipt_id: int, parsed: ParsedReceipt) -> None:
     with storage.connection() as conn:
         save_parsed_receipt(conn, receipt_id, parsed)
         if parsed.used_journal_fallback:
-            write_fetch_fallback_metadata(conn, parsed.invoice_number, "journal fallback used")
-        else:
-            conn.execute(
-                "DELETE FROM app_metadata WHERE key = 'receipt_fetch_fallback_last'",
+            validation_errors = parsed.journal_validation_errors
+            if not parsed.total_ok:
+                total_error = (
+                    f"item total {parsed.items_total:.2f} does not match "
+                    f"receipt total {parsed.total_amount:.2f}"
+                )
+                if total_error not in validation_errors:
+                    validation_errors += (total_error,)
+            record_journal_fallback(
+                conn,
+                parsed.invoice_number,
+                validation_errors,
             )
 
     if not parsed.total_ok:
@@ -412,21 +422,23 @@ def _load_top_fallback_categories(n: int) -> list[int]:
             f"SELECT COUNT(*) AS visible_count FROM categories c"  # noqa: S608
             f" WHERE {VISIBLE_CATEGORY_PREDICATE}",
         ).fetchone()["visible_count"]
-        if visible_count < 5:
+        minimum_visible = min(n, 5)
+        if visible_count < minimum_visible:
             raise InsufficientCategoriesError(
-                f"only {visible_count} visible categories — need at least 5",
+                f"only {visible_count} visible categories — need at least {minimum_visible}",
             )
 
         rows = conn.execute(
-            """
-            SELECT category_id, COUNT(*) AS cnt
-              FROM expenses
-             WHERE category_id IS NOT NULL
-               AND datetime >= datetime('now', '-3 months')
-             GROUP BY category_id
-             ORDER BY cnt DESC
+            f"""
+            SELECT e.category_id, COUNT(*) AS cnt
+              FROM expenses e
+              JOIN categories c ON c.id = e.category_id
+             WHERE e.datetime >= datetime('now', '-3 months')
+               AND {VISIBLE_CATEGORY_PREDICATE}
+             GROUP BY e.category_id
+             ORDER BY cnt DESC, e.category_id
              LIMIT ?
-            """,
+            """,  # noqa: S608
             [n],
         ).fetchall()
         result = [int(r["category_id"]) for r in rows]
@@ -528,7 +540,6 @@ def _compute_classifications(
     items: list[ReceiptItemRow],
     rule_hits: dict[int, RuleHit],
     llm_results: dict[int, ClassificationResult],
-    total_penalty: int,
 ) -> dict[int, tuple[int | None, int]]:
     """Merge rule and LLM results into {item_id: (category_id, confidence)}."""
     result: dict[int, tuple[int | None, int]] = {}
@@ -541,17 +552,16 @@ def _compute_classifications(
             if llm is None:
                 result[item.id] = (None, 1)
             else:
-                conf = max(1, llm.confidence_level - total_penalty)
-                result[item.id] = (llm.category_id, conf)
+                result[item.id] = (llm.category_id, llm.confidence_level)
     return result
 
 
-def _get_items(receipt_id: int) -> list[ReceiptItemRow]:
+def _get_items(job: ReceiptJobRow) -> list[ReceiptItemRow]:
     with storage.connection() as conn:
-        items = get_receipt_items(conn, receipt_id)
-        if not items:
+        items = get_receipt_items(conn, job.receipt_id)
+        if not items and not job.used_journal_fallback:
             raise RuntimeError(
-                f"receipt_id={receipt_id}: no items after parsing — parse error",
+                f"receipt_id={job.receipt_id}: no items after parsing — parse error",
             )
         return items
 
@@ -564,9 +574,33 @@ async def _classify_and_persist(
     chain_id: int | None,
 ) -> None:
     with storage.connection() as conn:
-        rule_hits, llm_queue, norms = _run_rules_pass(conn, items, chain_id)
+        classification_items = items
+        journal_correction_required = False
+        if job.used_journal_fallback:
+            receipt_total_row = conn.execute(
+                "SELECT total_amount FROM receipts WHERE id = ?",
+                [job.receipt_id],
+            ).fetchone()
+            if receipt_total_row is not None:
+                receipt_total = Decimal(str(receipt_total_row[0])).quantize(Decimal("0.01"))
+                stored_total_row = conn.execute(
+                    "SELECT COALESCE(SUM(total_price), 0) FROM receipt_items WHERE receipt_id = ?",
+                    [job.receipt_id],
+                ).fetchone()
+                items_total = Decimal(str(stored_total_row[0])).quantize(Decimal("0.01"))
+                journal_correction_required = items_total != receipt_total
+                if items_total > receipt_total:
+                    classification_items = []
+
+        rule_hits, llm_queue, norms = _run_rules_pass(conn, classification_items, chain_id)
         categories = load_categories(conn)
         tags = load_tags(conn)
+
+    journal_correction_category_id = None
+    if journal_correction_required:
+        journal_correction_category_id = (
+            await asyncio.to_thread(_load_top_fallback_categories, 1)
+        )[0]
 
     try:
         llm_results, llm_name = await _run_llm_pass(broker, job, llm_queue, categories, tags)
@@ -584,17 +618,16 @@ async def _classify_and_persist(
         }
         llm_name = None
 
-    total_penalty = 1 if job.used_journal_fallback else 0
-    classifications = _compute_classifications(items, rule_hits, llm_results, total_penalty)
+    classifications = _compute_classifications(classification_items, rule_hits, llm_results)
 
     await asyncio.to_thread(
         persist_classification_results,
         job,
-        items,
+        classification_items,
         classifications,
         rule_hits,
         llm_results,
         (store_id, chain_id),
         norms,
-        llm_name,
+        PersistenceOptions(llm_name, journal_correction_category_id),
     )

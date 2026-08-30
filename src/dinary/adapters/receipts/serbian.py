@@ -13,6 +13,7 @@ Fallback path (if /specifications fails or returns empty items):
 import base64
 import binascii
 import logging
+import math
 import re
 import struct
 from datetime import UTC, datetime
@@ -35,6 +36,7 @@ logger = logging.getLogger(__name__)
 _SPECS_URL = "https://suf.purs.gov.rs/specifications"
 _TOKEN_RE = re.compile(r"viewModel\.Token\('([^']+)'\)")
 _REQUEST_TIMEOUT = 30.0
+_TOTAL_TOLERANCE = 0.02
 
 
 def decode_qr_payload(url: str) -> QrPayload | None:
@@ -78,16 +80,12 @@ def _find_item_section_start(lines: list[str]) -> int | None:
 
 def _try_parse_value_line(name: str, line: str) -> ReceiptItem | None:
     parts = line.split()
-    if len(parts) < 3:
+    if len(parts) != 3:
         return None
     try:
-        return ReceiptItem(
-            name_raw=name,
-            unit_price=_rsd(parts[0]),
-            quantity=_rsd(parts[1]),
-            total_price=_rsd(parts[2]),
-            tax_label="",
-        )
+        unit_price = _rsd(parts[0])
+        quantity = _rsd(parts[1])
+        total_price = _rsd(parts[2])
     except ValueError:
         logger.warning(
             "Journal fallback: skipping malformed value line %r (item: %r)",
@@ -95,10 +93,50 @@ def _try_parse_value_line(name: str, line: str) -> ReceiptItem | None:
             name,
         )
         return None
+    if not all(math.isfinite(value) for value in (unit_price, quantity, total_price)):
+        return None
+    return ReceiptItem(
+        name_raw=name,
+        unit_price=unit_price,
+        quantity=quantity,
+        total_price=total_price,
+        tax_label="",
+    )
 
 
-def _parse_journal(journal: str) -> list[ReceiptItem]:
-    """Parse items from the fiscal receipt journal text.
+def _consume_journal_item_line(
+    line_number: int,
+    line: str,
+    current_name: str | None,
+    items: list[ReceiptItem],
+    errors: list[str],
+) -> str | None:
+    if not line[0].isspace():
+        if current_name is not None:
+            errors.append(f"missing value line for item {current_name!r}")
+        return line.strip()
+
+    if current_name is None:
+        errors.append(f"orphan value line at journal line {line_number}")
+        return None
+
+    item = _try_parse_value_line(current_name, line)
+    if item is None:
+        errors.append(f"malformed value line for item {current_name!r}")
+    else:
+        items.append(item)
+        expected_total = round(item.unit_price * item.quantity, 2)
+        if abs(expected_total - item.total_price) > _TOTAL_TOLERANCE:
+            errors.append(
+                f"item arithmetic mismatch for {current_name!r}: "
+                f"{item.unit_price:.2f} * {item.quantity:g} = {expected_total:.2f}, "
+                f"journal has {item.total_price:.2f}",
+            )
+    return None
+
+
+def _parse_journal(journal: str) -> tuple[list[ReceiptItem], tuple[str, ...]]:
+    """Parse and structurally validate items from the fiscal receipt journal text.
 
     Each item is exactly two lines:
       - Name line: no leading whitespace
@@ -108,26 +146,36 @@ def _parse_journal(journal: str) -> list[ReceiptItem]:
     lines = journal.replace("\r\n", "\n").splitlines()
     start = _find_item_section_start(lines)
     if start is None:
-        return []
+        return [], ("item section header not found",)
 
     items: list[ReceiptItem] = []
+    errors: list[str] = []
     current_name: str | None = None
+    section_ended = False
 
-    for line in lines[start:]:
+    for line_number, line in enumerate(lines[start:], start=start + 1):
         if not line.strip():
             continue
         if line.strip().startswith("---") or line.strip().startswith("Укупан"):
-            break
-        if line[0] == " ":
             if current_name is not None:
-                item = _try_parse_value_line(current_name, line)
-                if item is not None:
-                    items.append(item)
-            current_name = None
-        else:
-            current_name = line.strip()
+                errors.append(f"missing value line for item {current_name!r}")
+                current_name = None
+            section_ended = True
+            break
+        current_name = _consume_journal_item_line(
+            line_number,
+            line,
+            current_name,
+            items,
+            errors,
+        )
 
-    return items
+    if current_name is not None:
+        errors.append(f"missing value line for item {current_name!r}")
+    if not section_ended:
+        errors.append("item section terminator not found")
+
+    return items, tuple(errors)
 
 
 # ---------------------------------------------------------------------------
@@ -243,9 +291,9 @@ async def parse_receipt(url: str) -> ParsedReceipt:
         items = await _fetch_specs_items(client, url, invoice_number)
 
     used_journal_fallback = False
+    journal_validation_errors: tuple[str, ...] = ()
     if not items and journal:
-        logger.info("Using journal fallback for %s", url)
-        items = _parse_journal(journal)
+        items, journal_validation_errors = _parse_journal(journal)
         used_journal_fallback = True
 
     if not items:
@@ -255,6 +303,19 @@ async def parse_receipt(url: str) -> ParsedReceipt:
         )
 
     items_total = round(sum(i.total_price for i in items), 2)
+    total_ok = abs(items_total - total_amount) <= _TOTAL_TOLERANCE
+    if used_journal_fallback:
+        if not total_ok:
+            journal_validation_errors += (
+                f"item total {items_total:.2f} does not match receipt total {total_amount:.2f}",
+            )
+        validation = (
+            "passed"
+            if not journal_validation_errors
+            else f"failed: {'; '.join(journal_validation_errors)}"
+        )
+        logger.warning("Using journal fallback for %s; validation %s", url, validation)
+
     return ParsedReceipt(
         store_name=store_name,
         store_pib=store_pib,
@@ -262,7 +323,8 @@ async def parse_receipt(url: str) -> ParsedReceipt:
         invoice_number=invoice_number,
         items=items,
         items_total=items_total,
-        total_ok=abs(items_total - total_amount) <= 0.02,
+        total_ok=total_ok,
         used_journal_fallback=used_journal_fallback,
         purchase_datetime=purchase_datetime,
+        journal_validation_errors=journal_validation_errors,
     )

@@ -17,6 +17,7 @@ const catalog = useCatalogStore();
 const reviewStore = useReviewStore();
 
 const isDoubtful = computed(() => props.item.is_doubtful);
+const isCorrection = computed(() => props.item.review_kind === "expense_correction");
 const panelWidth = computed(() => (isDoubtful.value ? PANEL_DOUBTFUL : PANEL_CERTAIN));
 
 const { sliderEl, isOpen, isCommit, onPointerDown, onPointerMove, endDrag, shouldFireTap, close } =
@@ -75,6 +76,12 @@ const frequentPicks = computed(() =>
   catalog.frequentCategories.filter((c) => !usedCategoryIds.value.has(Number(c.id))),
 );
 
+function formatMoney(amount, currency) {
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return "—";
+  const formatted = value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return `${formatted} ${currency ?? ""}`.trim();
+}
 
 function approveFromButton(e, catId) {
   e.stopPropagation();
@@ -164,6 +171,15 @@ function onRowClick() {
       <!-- Bottom row -->
       <div class="row-bottom">
         <template v-if="isDoubtful">
+          <div v-if="isCorrection" class="correction-totals">
+            <span class="correction-amount" data-testid="correction-amount">
+              {{ formatMoney(item.total, item.currency) }} correction
+            </span>
+            <span class="receipt-total" data-testid="receipt-total">
+              {{ formatMoney(item.receipt_total, item.currency) }} receipt
+            </span>
+          </div>
+
           <!-- Tag chips -->
           <span v-for="tag in tags" :key="tag.id ?? tag" class="tag-chip">
             <template v-if="tag.icon">{{ tag.icon }} </template>{{ tag.name ?? tag }}
@@ -360,6 +376,23 @@ function onRowClick() {
   align-items: center;
   gap: 0.35rem;
   flex-wrap: wrap;
+}
+
+.correction-totals {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-basis: 100%;
+  font-size: 0.74rem;
+}
+
+.correction-amount {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.receipt-total {
+  color: var(--muted);
 }
 
 .row-category {

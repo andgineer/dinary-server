@@ -226,6 +226,62 @@ describe("ExpenseEditSheet — FROM RECEIPT pill", () => {
   });
 });
 
+describe("ExpenseEditSheet — correction classification", () => {
+  it("hides rule scope controls for a correction without a receipt item", () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    seedCatalog();
+    const correction = {
+      id: 90,
+      category_id: 1,
+      category_name: "еда",
+      tags: [],
+      event_id: null,
+      review_kind: "expense_correction",
+      receipt_id: 7,
+      item_name: null,
+      has_rule: false,
+      amount_original: 80,
+      receipt_total: 100,
+      currency_original: "RSD",
+    };
+
+    const wrapper = mountSheet(correction, pinia);
+
+    expect(wrapper.find('[data-testid="scope-selector"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="update-rule-wrap"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="correction-summary-amount"]').text()).toContain("80 RSD");
+    expect(wrapper.get('[data-testid="correction-summary-receipt-total"]').text()).toContain(
+      "100 RSD",
+    );
+    wrapper.unmount();
+  });
+
+  it("keeps scope controls for a classified receipt item", () => {
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    seedCatalog();
+    const expense = {
+      id: 10,
+      category_id: 1,
+      category_name: "еда",
+      tags: [],
+      event_id: null,
+      receipt_id: 7,
+      item_name: "hleb",
+      has_rule: true,
+      amount_original: 80,
+      currency_original: "RSD",
+    };
+
+    const wrapper = mountSheet(expense, pinia);
+
+    expect(wrapper.find('[data-testid="scope-selector"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="correction-summary"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
 describe("ExpenseEditSheet — delete flow (manual)", () => {
   it("shows delete button for an expense", () => {
     const pinia = createPinia();

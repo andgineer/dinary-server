@@ -29,6 +29,21 @@ def count_doubtful(con: sqlite3.Connection) -> int:
     ).fetchone()[0]
 
 
+def count_pending_correction_reviews(con: sqlite3.Connection) -> int:
+    return con.execute(
+        """
+        SELECT COUNT(*)
+          FROM expenses e
+         WHERE e.receipt_id IS NOT NULL
+           AND e.confidence_level < 4
+           AND e.rule_id IS NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM receipt_items ri WHERE ri.expense_id = e.id
+           )
+        """,
+    ).fetchone()[0]
+
+
 def _resolve_ids_to_names(
     con: sqlite3.Connection,
     table: str,
@@ -125,6 +140,79 @@ def query_rules(
     ]
 
 
+def query_pending_correction_reviews(
+    con: sqlite3.Connection,
+    limit: int,
+    offset: int,
+) -> list[dict[str, Any]]:
+    rows = con.execute(
+        """
+        SELECT e.id,
+               e.datetime,
+               e.amount_original,
+               e.currency_original,
+               e.category_id,
+               e.confidence_level,
+               e.comment,
+               e.receipt_id,
+               r.total_amount AS receipt_total,
+               e.event_id,
+               ev.name AS event_name,
+               COALESCE(sc.name, s.name) AS store_name,
+               c.name AS category_name,
+               (SELECT json_group_array(et.tag_id)
+                  FROM expense_tags et
+                 WHERE et.expense_id = e.id) AS tag_ids
+          FROM expenses e
+          JOIN receipts r ON r.id = e.receipt_id
+          JOIN categories c ON c.id = e.category_id
+          LEFT JOIN events ev ON ev.id = e.event_id
+          LEFT JOIN stores s ON s.id = e.store_id
+          LEFT JOIN shop_chains sc ON sc.id = s.chain_id
+         WHERE e.receipt_id IS NOT NULL
+           AND e.confidence_level < 4
+           AND e.rule_id IS NULL
+           AND NOT EXISTS (
+               SELECT 1 FROM receipt_items ri WHERE ri.expense_id = e.id
+           )
+         ORDER BY e.amount_original DESC, e.id DESC
+         LIMIT ? OFFSET ?
+        """,
+        [limit, offset],
+    ).fetchall()
+    return [
+        {
+            "review_kind": "expense_correction",
+            "is_doubtful": True,
+            "is_correction": True,
+            "id": int(row["id"]),
+            "expense_id": int(row["id"]),
+            "name": str(row["comment"]) if row["comment"] else "Receipt processing correction",
+            "store": str(row["store_name"]) if row["store_name"] else None,
+            "total": float(row["amount_original"]),
+            "count": 1,
+            "currency": str(row["currency_original"]),
+            "confidence_level": int(row["confidence_level"]),
+            "category_id": int(row["category_id"]),
+            "category_name": str(row["category_name"]),
+            "datetime": str(row["datetime"]),
+            "alternative_categories": [],
+            "tags": _resolve_ids_to_names(con, "tags", row["tag_ids"]),
+            "receipt_id": int(row["receipt_id"]),
+            "receipt_total": float(row["receipt_total"]),
+            "event_id": int(row["event_id"]) if row["event_id"] is not None else None,
+            "event_name": str(row["event_name"]) if row["event_name"] else None,
+            "has_rule": False,
+            "rule_id": None,
+            "item_name": None,
+            "amount_original": float(row["amount_original"]),
+            "currency_original": str(row["currency_original"]),
+            "comment": str(row["comment"]) if row["comment"] else None,
+        }
+        for row in rows
+    ]
+
+
 def confirm_rules_bulk(con: sqlite3.Connection, rule_ids: list[int]) -> int:
     if not rule_ids:
         return 0
@@ -195,13 +283,21 @@ def build_rules_feed(
     doubtful_only: bool = True,
 ) -> dict[str, Any]:
     offset = (page - 1) * page_size
-    d_total = count_doubtful(con)
+    rule_total = count_doubtful(con)
+    correction_total = count_pending_correction_reviews(con)
+    d_total = rule_total + correction_total
     effective_total = d_total
-    rows = (
-        query_rules(con, page_size, offset, doubtful_only=doubtful_only)
-        if effective_total > 0
-        else []
-    )
+
+    if doubtful_only:
+        correction_rows = query_pending_correction_reviews(con, page_size, offset)
+        remaining = page_size - len(correction_rows)
+        rule_offset = max(0, offset - correction_total)
+        rule_rows = (
+            query_rules(con, remaining, rule_offset, doubtful_only=True) if remaining else []
+        )
+        rows = [*correction_rows, *rule_rows]
+    else:
+        rows = query_rules(con, page_size, offset, doubtful_only=False)
     return {
         "doubtful_count": d_total,
         "items": rows,

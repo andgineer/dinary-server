@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import allure
 import pytest
 
+from dinary.background.classification.persist import JOURNAL_CORRECTION_COMMENT
 from dinary.db import storage
 
 from _api_helpers import db  # noqa: F401
@@ -59,6 +60,24 @@ def _seed_certain_rule(conn):
     )
 
 
+def _seed_pending_journal_correction(conn, expense_id: int = 90) -> None:
+    conn.execute("INSERT OR IGNORE INTO shop_chains (id, name) VALUES (1, 'Lidl')")
+    conn.execute(
+        "INSERT OR IGNORE INTO stores (id, name, chain_id, pib) VALUES (1, 'Lidl', 1, '100')"
+    )
+    conn.execute(
+        "INSERT INTO receipts (id, client_receipt_id, url, store_id, total_amount)"
+        " VALUES (90, 'correction-r1', 'https://x', 1, 100)"
+    )
+    conn.execute(
+        "INSERT INTO expenses"
+        " (id, datetime, amount, amount_original, currency_original, category_id,"
+        "  confidence_level, comment, receipt_id, store_id)"
+        " VALUES (?, '2026-05-01T10:00:00', 80, 80, 'RSD', 1, 1, ?, 90, 1)",
+        [expense_id, JOURNAL_CORRECTION_COMMENT],
+    )
+
+
 @allure.epic("Receipts")
 @allure.feature("API")
 @allure.story("Receipt review")
@@ -99,6 +118,61 @@ class TestReviewFeed:
         assert d["category_id"] == 1
         assert d["expense_id"] == 42
         assert "id" in d
+
+    def test_journal_correction_requires_review(self, client, db):  # noqa: ARG002
+        conn = storage.get_connection()
+        try:
+            _seed_pending_journal_correction(conn)
+        finally:
+            conn.close()
+
+        response = client.get("/api/rules/feed")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["doubtful_count"] == 1
+        assert len(data["items"]) == 1
+        item = data["items"][0]
+        assert item["review_kind"] == "expense_correction"
+        assert item["is_doubtful"] is True
+        assert item["expense_id"] == 90
+        assert item["total"] == 80
+        assert item["receipt_total"] == 100
+        assert item["confidence_level"] == 1
+        assert item["comment"] == JOURNAL_CORRECTION_COMMENT
+        assert item["has_rule"] is False
+        assert item["item_name"] is None
+
+    def test_correction_and_rule_paginate_without_collision(self, client, db):  # noqa: ARG002
+        conn = storage.get_connection()
+        try:
+            _seed_pending_journal_correction(conn, expense_id=42)
+            conn.execute(
+                "INSERT INTO classification_rules"
+                " (id, chain_id, item_name_normalized, category_id, confidence_level, source)"
+                " VALUES (42, 1, 'hleb', 1, 3, 'llm')"
+            )
+            conn.execute(
+                "INSERT INTO expenses"
+                " (id, datetime, amount, amount_original, currency_original, category_id,"
+                "  confidence_level, receipt_id, store_id, rule_id)"
+                " VALUES (43, '2026-05-01T10:00:00', 20, 20, 'RSD', 1, 3, 90, 1, 42)"
+            )
+            conn.execute(
+                "INSERT INTO receipt_items"
+                " (receipt_id, name_raw, name_normalized, total_price, quantity, unit_price,"
+                "  expense_id) VALUES (90, 'hleb', 'hleb', 20, 1, 20, 43)"
+            )
+        finally:
+            conn.close()
+
+        page_one = client.get("/api/rules/feed?page=1&page_size=1").json()
+        page_two = client.get("/api/rules/feed?page=2&page_size=1").json()
+
+        assert page_one["doubtful_count"] == 2
+        assert page_one["items"][0]["review_kind"] == "expense_correction"
+        assert page_two["items"][0]["id"] == 42
+        assert "review_kind" not in page_two["items"][0]
 
     def test_pagination(self, client, db):  # noqa: ARG002
         resp = client.get("/api/rules/feed?page=1&page_size=5")
@@ -358,6 +432,34 @@ class TestCategoryCorrection:
         assert rule[0] == 2
         assert rule[1] == 4
         assert rule[2] == "user_correction"
+
+    def test_journal_correction_confirmation_does_not_create_rule(
+        self,
+        client,
+        db,  # noqa: ARG002
+    ):
+        conn = storage.get_connection()
+        try:
+            _seed_pending_journal_correction(conn)
+        finally:
+            conn.close()
+
+        response = client.patch("/api/expenses/90/category", json={"category_id": 2})
+
+        assert response.status_code == 200
+        conn = storage.get_connection()
+        try:
+            expense = conn.execute(
+                "SELECT category_id, confidence_level FROM expenses WHERE id = 90"
+            ).fetchone()
+            rule_count = conn.execute("SELECT COUNT(*) FROM classification_rules").fetchone()[0]
+            feed = client.get("/api/rules/feed").json()
+        finally:
+            conn.close()
+
+        assert tuple(expense) == (2, 4)
+        assert rule_count == 0
+        assert feed["doubtful_count"] == 0
 
     def test_correction_unknown_expense_returns_404(self, client, db):  # noqa: ARG002
         resp = client.patch("/api/expenses/9999/category", json={"category_id": 1})

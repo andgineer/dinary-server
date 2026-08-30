@@ -96,6 +96,57 @@ describe("review store: correct()", () => {
     expect(spy).toHaveBeenCalledWith(101, 2, "month");
   });
 
+  it("confirms an expense correction without calling the rules API", async () => {
+    const correctionSpy = vi
+      .spyOn(expenseCorrections, "correctCategory")
+      .mockResolvedValueOnce({ corrected_expense_id: 42, batch_updated_count: 0 });
+    const ruleSpy = vi.spyOn(reviewApi, "approveRule");
+
+    seedCatalog();
+    const store = useReviewStore();
+    store.items = [
+      {
+        id: 42,
+        expense_id: 42,
+        review_kind: "expense_correction",
+        is_doubtful: true,
+        count: 1,
+      },
+    ];
+    store.expenses = [{ id: 42, category_id: 1, confidence_level: 1 }];
+    store.doubtfulCount = 1;
+
+    await store.correct(store.items[0], 2, "all");
+
+    expect(correctionSpy).toHaveBeenCalledWith(42, 2, "single");
+    expect(ruleSpy).not.toHaveBeenCalled();
+    expect(store.items).toHaveLength(0);
+    expect(store.doubtfulCount).toBe(0);
+    expect(store.expenses[0]).toMatchObject({ category_id: 2, confidence_level: 4 });
+  });
+
+  it("does not remove a rule whose id matches a confirmed correction expense", async () => {
+    vi.spyOn(expenseCorrections, "correctCategory").mockResolvedValueOnce({
+      corrected_expense_id: 42,
+      batch_updated_count: 0,
+    });
+    seedCatalog();
+    const store = useReviewStore();
+    store.items = [
+      { id: 42, is_doubtful: true, name: "rule" },
+      {
+        id: 42,
+        expense_id: 42,
+        review_kind: "expense_correction",
+        is_doubtful: true,
+      },
+    ];
+
+    await store.correct(store.items[1], 2);
+
+    expect(store.items).toEqual([{ id: 42, is_doubtful: true, name: "rule" }]);
+  });
+
   it("uses count from correctCategory result for scoped correction toast", async () => {
     vi.spyOn(expenseCorrections, "correctCategory").mockResolvedValueOnce({
       count: 3,
@@ -465,6 +516,22 @@ describe("review store: loadNextPage()", () => {
 
     expect(store.items).toHaveLength(1);
   });
+
+  it("keeps a rule and correction expense that share the same numeric id", async () => {
+    vi.spyOn(reviewApi, "getReviewFeed").mockResolvedValueOnce({
+      items: [
+        { id: 42, is_doubtful: true, name: "rule" },
+        { id: 42, review_kind: "expense_correction", is_doubtful: true },
+      ],
+      doubtful_count: 2,
+      has_more: false,
+    });
+
+    const store = useReviewStore();
+    await store.loadNextPage();
+
+    expect(store.items).toHaveLength(2);
+  });
 });
 
 describe("review store: updateExpense()", () => {
@@ -505,6 +572,30 @@ describe("review store: updateExpense()", () => {
     await store.updateExpense(42, { update_rule: true });
 
     expect(store.items.map((i) => i.id)).toEqual([8]);
+    expect(store.doubtfulCount).toBe(1);
+  });
+
+  it("removes a correction after its category is saved from the expense sheet", async () => {
+    vi.spyOn(expenseCorrections, "editExpense").mockResolvedValueOnce({});
+    const store = useReviewStore();
+    store.items = [
+      {
+        id: 42,
+        expense_id: 42,
+        review_kind: "expense_correction",
+        is_doubtful: true,
+      },
+      { id: 42, expense_id: 99, is_doubtful: true, name: "rule" },
+    ];
+    store.expenses = [{ id: 42, confidence_level: 1 }];
+    store.doubtfulCount = 2;
+
+    await store.updateExpense(42, { category_id: 2, update_rule: false });
+
+    expect(store.items).toEqual([
+      { id: 42, expense_id: 99, is_doubtful: true, name: "rule" },
+    ]);
+    expect(store.expenses[0].confidence_level).toBe(4);
     expect(store.doubtfulCount).toBe(1);
   });
 
@@ -661,6 +752,23 @@ describe("review store: confirmAll()", () => {
     ];
     store.doubtfulCount = 3;
     await store.confirmAll([1, 2]);
+    expect(store.doubtfulCount).toBe(1);
+  });
+
+  it("never removes a correction expense with the same id as a confirmed rule", async () => {
+    vi.spyOn(reviewApi, "confirmAllRules").mockResolvedValueOnce({ confirmed: 1 });
+    const store = useReviewStore();
+    store.items = [
+      { id: 1, is_doubtful: true },
+      { id: 1, review_kind: "expense_correction", is_doubtful: true },
+    ];
+    store.doubtfulCount = 2;
+
+    await store.confirmAll([1]);
+
+    expect(store.items).toEqual([
+      { id: 1, review_kind: "expense_correction", is_doubtful: true },
+    ]);
     expect(store.doubtfulCount).toBe(1);
   });
 
